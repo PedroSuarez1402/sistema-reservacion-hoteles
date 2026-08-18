@@ -1,5 +1,9 @@
 import UserService from '../services/user.service.js';
 import { signToken } from '../middlewares/auth.middleware.js';
+import {
+  BadRequestError,
+  ForbiddenError,
+} from '../utils/errors.util.js';
 
 class UserController {
   static async getAll(req, res, next) {
@@ -62,19 +66,9 @@ class UserController {
     try {
       const { email, password } = req.body;
       if (!email || !password) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email y contraseña son requeridos',
-        });
+        throw new BadRequestError('Email y contraseña son requeridos');
       }
-      const user = await UserService.getByEmail(email);
-      const isMatch = await user.comparePassword(String(password));
-      if (!isMatch) {
-        return res.status(401).json({
-          success: false,
-          message: 'Credenciales inválidas',
-        });
-      }
+      const user = await UserService.loginWithPassword(email, password);
       const token = signToken({
         id: user.id,
         email: user.email,
@@ -119,10 +113,7 @@ class UserController {
       const { id } = req.params;
       const esAdmin = req.user && req.user.rol === 'ADMIN';
       if (!esAdmin && req.user.id !== id) {
-        return res.status(403).json({
-          success: false,
-          message: 'No tienes permiso para modificar este usuario',
-        });
+        throw new ForbiddenError('No tienes permiso para modificar este usuario');
       }
       const updateData = { ...req.body };
       if (!esAdmin) {

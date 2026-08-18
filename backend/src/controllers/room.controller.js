@@ -1,4 +1,5 @@
 import RoomService from '../services/room.service.js';
+import { BadRequestError } from '../utils/errors.util.js';
 
 class RoomController {
   static async getAll(req, res, next) {
@@ -18,10 +19,7 @@ class RoomController {
     try {
       const { fecha_inicio, fecha_fin } = req.query;
       if (!fecha_inicio || !fecha_fin) {
-        return res.status(400).json({
-          success: false,
-          message: 'Los parámetros fecha_inicio y fecha_fin son requeridos',
-        });
+        throw new BadRequestError('Los parámetros fecha_inicio y fecha_fin son requeridos');
       }
       const rooms = await RoomService.getAvailable(fecha_inicio, fecha_fin);
       res.status(200).json({

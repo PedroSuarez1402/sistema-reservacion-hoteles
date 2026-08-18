@@ -1,4 +1,5 @@
 import ReservationService from '../services/reservation.service.js';
+import { ForbiddenError } from '../utils/errors.util.js';
 
 class ReservationController {
   static async getAll(req, res, next) {
@@ -19,15 +20,10 @@ class ReservationController {
       const { id } = req.params;
       const reserva = await ReservationService.getReservationById(id);
 
-      if (
-        req.user.rol !== 'ADMIN' &&
-        req.user.rol !== 'RECEPCION' &&
-        reserva.usuario_id !== req.user.id
-      ) {
-        return res.status(403).json({
-          success: false,
-          message: 'No tienes permiso para ver esta reserva',
-        });
+      const esStaff =
+        req.user.rol === 'ADMIN' || req.user.rol === 'RECEPCION';
+      if (!esStaff && reserva.usuario_id !== req.user.id) {
+        throw new ForbiddenError('No tienes permiso para ver esta reserva');
       }
 
       res.status(200).json({
@@ -66,20 +62,11 @@ class ReservationController {
   static async update(req, res, next) {
     try {
       const { id } = req.params;
-      const usuario_id = req.user.id;
       const reserva = await ReservationService.getReservationById(id);
-      const esAdminORecepcion =
-        req.user.rol === 'ADMIN' || req.user.rol === 'RECEPCION';
-      if (!esAdminORecepcion && reserva.usuario_id !== usuario_id) {
-        return res.status(403).json({
-          success: false,
-          message: 'No tienes permiso para modificar esta reserva',
-        });
-      }
 
       const actualizada = await ReservationService.updateReservation(
         id,
-        esAdminORecepcion ? req.body.usuario_id || reserva.usuario_id : usuario_id,
+        req.user,
         req.body
       );
 
@@ -96,18 +83,8 @@ class ReservationController {
   static async cancel(req, res, next) {
     try {
       const { id } = req.params;
-      const reserva = await ReservationService.getReservationById(id);
-      const esAdminORecepcion =
-        req.user.rol === 'ADMIN' || req.user.rol === 'RECEPCION';
-      if (!esAdminORecepcion && reserva.usuario_id !== req.user.id) {
-        return res.status(403).json({
-          success: false,
-          message: 'No tienes permiso para cancelar esta reserva',
-        });
-      }
-
-      await ReservationService.cancelReservation(id, reserva.usuario_id);
-
+      const usuario = req.user;
+      await ReservationService.cancelReservation(id, usuario);
       res.status(200).json({
         success: true,
         message: 'Reserva cancelada correctamente',
@@ -120,14 +97,8 @@ class ReservationController {
   static async remove(req, res, next) {
     try {
       const { id } = req.params;
-      const esAdminORecepcion =
-        req.user.rol === 'ADMIN' || req.user.rol === 'RECEPCION';
       const reserva = await ReservationService.getReservationById(id);
-      await ReservationService.deleteReservation(
-        id,
-        reserva.usuario_id,
-        esAdminORecepcion
-      );
+      await ReservationService.deleteReservation(id, req.user, true);
       res.status(200).json({
         success: true,
         message: 'Reserva eliminada correctamente',

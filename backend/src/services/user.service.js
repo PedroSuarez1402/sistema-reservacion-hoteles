@@ -1,14 +1,22 @@
 import UserRepository from '../repositories/user.repository.js';
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  assertRequired,
+} from '../utils/errors.util.js';
 
 class UserService {
   static async create(data) {
-    const { email } = data;
-    if (!email) {
-      throw new Error('El email es requerido');
-    }
+    const { email, password, nombre } = data;
+
+    assertRequired(email, 'El email es requerido');
+    assertRequired(password, 'La contraseña es requerida');
+    assertRequired(nombre, 'El nombre es requerido');
+
     const exists = await UserRepository.getByEmail(email);
     if (exists) {
-      throw new Error('Ya existe un usuario con este email');
+      throw new ConflictError('Ya existe un usuario con este email');
     }
     return await UserRepository.create(data);
   }
@@ -18,17 +26,19 @@ class UserService {
   }
 
   static async getById(id) {
+    assertRequired(id, 'El id del usuario es requerido');
     const user = await UserRepository.getById(id);
     if (!user) {
-      throw new Error('Usuario no encontrado');
+      throw new NotFoundError('Usuario no encontrado');
     }
     return user;
   }
 
   static async getByEmail(email) {
+    assertRequired(email, 'El email es requerido');
     const user = await UserRepository.getByEmail(email);
     if (!user) {
-      throw new Error('Usuario no encontrado');
+      throw new NotFoundError('Usuario no encontrado');
     }
     return user;
   }
@@ -38,7 +48,7 @@ class UserService {
     if (data.email) {
       const exists = await UserRepository.emailExists(data.email, id);
       if (exists) {
-        throw new Error('Ya existe un usuario con este email');
+        throw new ConflictError('Ya existe un usuario con este email');
       }
     }
     return await UserRepository.update(id, data);
@@ -47,6 +57,18 @@ class UserService {
   static async delete(id) {
     await this.getById(id);
     return await UserRepository.delete(id);
+  }
+
+  static async loginWithPassword(email, password) {
+    assertRequired(email, 'El email es requerido', BadRequestError);
+    assertRequired(password, 'La contraseña es requerida', BadRequestError);
+
+    const user = await this.getByEmail(email);
+    const isMatch = await user.comparePassword(String(password));
+    if (!isMatch) {
+      throw new BadRequestError('Credenciales inválidas');
+    }
+    return user;
   }
 }
 
