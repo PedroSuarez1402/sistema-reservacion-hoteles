@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node --env-file=.env index.js",
     "dev": "node --env-file=.env --watch index.js",
-    "test": "node --test"
+    "test": "node --test",
+    "seed": "node --env-file=.env src/seeders/index.js",
+    "seed:undo": "node --env-file=.env src/seeders/undo.js"
   },
   "author": "",
   "license": "ISC",
