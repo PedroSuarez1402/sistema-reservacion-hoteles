@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { Providers } from './providers';
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "Sistema de Reservación de Hoteles",
-  description: "Aplicación de gestión de reservas hoteleras",
+  title: 'Sistema de Reservación de Hoteles',
+  description: 'Aplicación de gestión de reservas hoteleras',
 };
 
 export default function RootLayout({
@@ -16,7 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

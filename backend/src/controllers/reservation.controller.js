@@ -15,6 +15,20 @@ class ReservationController {
     }
   }
 
+  static async getMyReservations(req, res, next) {
+    try {
+      const usuario_id = req.user.id;
+      const reservas = await ReservationService.getReservationsByUser(usuario_id);
+      res.status(200).json({
+        success: true,
+        message: 'Tus reservas obtenidas correctamente',
+        data: reservas,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getById(req, res, next) {
     try {
       const { id } = req.params;

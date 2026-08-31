@@ -1,0 +1,87 @@
+# ============================================================
+# ARCHIVOS DE PRUEBAS DE APIs (colecciones YAML/JSON)
+# ============================================================
+/sistema-reservacion-hoteles/
+sistema-reservacion-hoteles/
+*.bruno/
+*.postman_collection.json
+*.postman_environment.json
+backend/test-models.js
+backend/*.test.js
+backend/**/*.test.js
+backend/**/*.spec.js
+frontend/**/*.test.*
+frontend/**/*.spec.*
+/coverage/
+
+# ============================================================
+# BACKEND (Node.js / Express)
+# ============================================================
+backend/node_modules/
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/dist/
+backend/build/
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+backend/pnpm-debug.log*
+
+# ============================================================
+# FRONTEND (Next.js)
+# ============================================================
+frontend/node_modules/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/next-env.d.ts
+frontend/.turbo/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/.vercel
+
+# ============================================================
+# GENERALES / OS / EDITORES
+# ============================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / Editor
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Variables de entorno raíz
+.env
+.env.*
+!.env.example
+
+# Dependencias
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Testing / Builds generales
+/dist
+/build
+/.next
+/out
+
+# TypeScript
+*.tsbuildinfo
