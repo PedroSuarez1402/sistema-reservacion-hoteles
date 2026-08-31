@@ -8,9 +8,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Building2, Mail, Lock, ArrowRight } from 'lucide-react';
-import { Button, Card, CardContent, Input, useToast } from '../../../components';
-import useAuth from '../../../hooks/useAuth';
-import useAuthStore from '../../../store/useAuthStore';
+import { Button, Card, CardContent, Input, useToast } from '@/components';
+import useAuth from '@/hooks/useAuth';
 
 const loginSchema = z.object({
   email: z
@@ -62,13 +61,6 @@ function LoginInner() {
     try {
       await login(values);
       toast.success('Bienvenido de nuevo', 'Has iniciado sesión correctamente');
-      const finalRedirect =
-        redirect === '/dashboard'
-          ? useAuthStore.getState().isRecepcionOrAdmin()
-            ? '/dashboard/admin'
-            : '/dashboard/mis-reservas'
-          : redirect;
-      router.replace(finalRedirect);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'No se pudo iniciar sesión';

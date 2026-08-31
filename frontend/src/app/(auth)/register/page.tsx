@@ -7,9 +7,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Building2, Mail, Lock, UserPlus, User as UserIcon, CheckCircle2 } from 'lucide-react';
-import { Button, Card, CardContent, Input, useToast } from '../../../components';
-import useAuth from '../../../hooks/useAuth';
-import useAuthStore from '../../../store/useAuthStore';
+import { Button, Card, CardContent, Input, useToast } from '@/components';
+import useAuth from '@/hooks/useAuth';
 
 const registerSchema = z
   .object({
@@ -61,22 +60,17 @@ function RegisterPage() {
 
   React.useEffect(() => {
     if (isAuthenticated && user) {
-      const finalRedirect = useAuthStore.getState().isRecepcionOrAdmin()
+      const finalRedirect = isRecepcionOrAdmin
         ? '/dashboard/admin'
         : '/dashboard/mis-reservas';
       router.replace(finalRedirect);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, isRecepcionOrAdmin, router, user]);
 
   async function onSubmit(values: RegisterFormValues) {
     try {
       await registerAuth(values);
       toast.success('Cuenta creada', 'Tu cuenta ha sido creada exitosamente');
-      const finalRedirect = isRecepcionOrAdmin
-        ? '/dashboard/admin'
-        : '/dashboard/mis-reservas';
-      router.replace(finalRedirect);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'No se pudo crear la cuenta';

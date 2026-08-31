@@ -4,9 +4,9 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { CalendarDays, LayoutDashboard, Settings2, Hotel } from 'lucide-react';
-import { cn } from '../../../lib/utils';
-import useAuth from '../../../hooks/useAuth';
-import type { UserRole } from '../../../types';
+import { cn } from '@/lib/utils';
+import useAuth from '@/hooks/useAuth';
+import type { UserRole } from '@/types';
 
 function DashboardSidebar() {
   const pathname = usePathname();

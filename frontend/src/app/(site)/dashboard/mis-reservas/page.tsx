@@ -15,10 +15,10 @@ import {
   Dialog,
   ReservationTable,
   useToast,
-} from '../../../../components';
-import { useCancelReservation, useMyReservations } from '../../../../hooks';
-import { calculateNights, formatCurrency, formatDate } from '../../../../lib/utils';
-import type { Reservation } from '../../../../types';
+} from '@/components';
+import { useCancelReservation, useMyReservations } from '@/hooks';
+import { calculateNights, formatCurrency, formatDate } from '@/lib/utils';
+import type { ApiErrorResponse, Reservation } from '@/types';
 
 function SummaryCards({ reservations }: { reservations: Reservation[] }) {
   const total = reservations.length;
@@ -82,10 +82,28 @@ function SummaryCards({ reservations }: { reservations: Reservation[] }) {
 function MyReservationsPage() {
   const router = useRouter();
   const toast = useToast();
-  const { data: reservations, isLoading, refetch } = useMyReservations();
+  const {
+    data: reservations,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useMyReservations();
   const cancelMutation = useCancelReservation();
 
   const [confirmCancelId, setConfirmCancelId] = React.useState<Reservation | null>(null);
+
+  React.useEffect(() => {
+    if (isError) {
+      const err = error as unknown as ApiErrorResponse | Error | null;
+      const msg =
+        (err && 'message' in err ? err.message : undefined) ||
+        'No se pudieron cargar tus reservas';
+      toast.error('Error al cargar reservas', msg);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isError, error]);
 
   async function handleCancel(reservation: Reservation) {
     setConfirmCancelId(reservation);
@@ -97,7 +115,6 @@ function MyReservationsPage() {
       await cancelMutation.mutateAsync(confirmCancelId.id);
       toast.success('Reserva cancelada', 'Tu reserva ha sido cancelada correctamente');
       setConfirmCancelId(null);
-      void refetch();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'No se pudo cancelar la reserva';
@@ -133,12 +150,33 @@ function MyReservationsPage() {
 
       <ReservationTable
         reservations={reservations}
-        isLoading={isLoading}
+        isLoading={isLoading || isFetching}
         isStaff={false}
         showRoomInfo={true}
         onCancel={handleCancel}
         isEmptyMessage="Aún no tienes reservas. ¡Reserva tu primera estancia!"
       />
+
+      {isError ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+              <div className="space-y-1">
+                <p className="font-semibold text-rose-700">
+                  No se pudieron cargar las reservas
+                </p>
+                <p className="text-sm text-rose-600">
+                  {(() => {
+                    const e = error as unknown as ApiErrorResponse | Error | null;
+                    return e && 'message' in e ? e.message : 'Inténtalo de nuevo en unos momentos.';
+                  })()}
+                </p>
+              </div>
+              <Button onClick={() => refetch()}>Reintentar</Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Dialog
         open={!!confirmCancelId}

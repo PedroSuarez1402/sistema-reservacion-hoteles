@@ -23,8 +23,8 @@ import {
   RoomCard,
   RoomModal,
   useToast,
-} from '../../../../components';
-import { cn } from '../../../../lib/utils';
+} from '@/components';
+import { cn } from '@/lib/utils';
 import {
   useAllReservations,
   useCancelReservation,
@@ -34,9 +34,9 @@ import {
   useRooms,
   useUpdateReservationStatus,
   useUpdateRoom,
-} from '../../../../hooks';
-import { formatCurrency } from '../../../../lib/utils';
-import type { CreateRoomPayload, Reservation, ReservationStatus, Room, UpdateRoomPayload } from '../../../../types';
+} from '@/hooks';
+import { formatCurrency } from '@/lib/utils';
+import type { ApiErrorResponse, CreateRoomPayload, Reservation, ReservationStatus, Room, UpdateRoomPayload } from '@/types';
 
 type AdminTab = 'reservaciones' | 'habitaciones';
 
@@ -187,11 +187,33 @@ function AdminPage() {
   const [roomEditing, setRoomEditing] = React.useState<Room | null>(null);
   const [confirmDeleteRoom, setConfirmDeleteRoom] = React.useState<Room | null>(null);
 
+  React.useEffect(() => {
+    if (reservationsQuery.isError) {
+      const err = reservationsQuery.error as unknown as ApiErrorResponse | Error | null;
+      const msg =
+        (err && 'message' in err ? err.message : undefined) ||
+        'No se pudieron cargar las reservaciones';
+      toast.error('Error al cargar reservaciones', msg);
+    }
+    if (roomsQuery.isError) {
+      const err = roomsQuery.error as unknown as ApiErrorResponse | Error | null;
+      const msg =
+        (err && 'message' in err ? err.message : undefined) ||
+        'No se pudo cargar el inventario de habitaciones';
+      toast.error('Error al cargar habitaciones', msg);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    reservationsQuery.isError,
+    reservationsQuery.error,
+    roomsQuery.isError,
+    roomsQuery.error,
+  ]);
+
   async function handleStatusChange(id: string, estado: ReservationStatus) {
     try {
       await statusMutation.mutateAsync({ id, payload: { estado } });
       toast.success('Estado actualizado', `La reserva ahora está ${estado.toLowerCase()}`);
-      void reservationsQuery.refetch();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo actualizar';
       toast.error('Error al actualizar estado', message);
@@ -204,7 +226,6 @@ function AdminPage() {
       await cancelMutation.mutateAsync(confirmCancel.id);
       toast.success('Reserva cancelada', 'Se actualizó el estado a Cancelada');
       setConfirmCancel(null);
-      void reservationsQuery.refetch();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo cancelar';
       toast.error('Error al cancelar', message);
@@ -217,7 +238,6 @@ function AdminPage() {
       await deleteReservationMutation.mutateAsync(confirmDeleteReservation.id);
       toast.success('Reserva eliminada', 'La reserva fue eliminada del sistema');
       setConfirmDeleteReservation(null);
-      void reservationsQuery.refetch();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo eliminar';
       toast.error('Error al eliminar reserva', message);
@@ -246,7 +266,6 @@ function AdminPage() {
       }
       setRoomModalOpen(false);
       setRoomEditing(null);
-      void roomsQuery.refetch();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo guardar la habitación';
       toast.error('Error al guardar habitación', message);
@@ -259,7 +278,6 @@ function AdminPage() {
       await deleteRoomMutation.mutateAsync(confirmDeleteRoom.id);
       toast.success('Habitación eliminada', `Habit. ${confirmDeleteRoom.numero} eliminada correctamente`);
       setConfirmDeleteRoom(null);
-      void roomsQuery.refetch();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo eliminar la habitación';
       toast.error('Error al eliminar habitación', message);
@@ -329,7 +347,7 @@ function AdminPage() {
           <ReservationSummary reservations={reservationsQuery.data ?? []} />
           <ReservationTable
             reservations={reservationsQuery.data}
-            isLoading={reservationsQuery.isLoading}
+            isLoading={reservationsQuery.isLoading || reservationsQuery.isFetching}
             isStaff={true}
             showUserColumn={true}
             showRoomInfo={true}
@@ -337,6 +355,26 @@ function AdminPage() {
             onStatusChange={handleStatusChange}
             onDelete={(r) => setConfirmDeleteReservation(r)}
           />
+          {reservationsQuery.isError ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                  <div className="space-y-1">
+                    <p className="font-semibold text-rose-700">
+                      Error al cargar las reservaciones
+                    </p>
+                    <p className="text-sm text-rose-600">
+                      {(() => {
+                        const e = reservationsQuery.error as unknown as ApiErrorResponse | Error | null;
+                        return e && 'message' in e ? e.message : 'Inténtalo de nuevo en unos momentos.';
+                      })()}
+                    </p>
+                  </div>
+                  <Button onClick={() => reservationsQuery.refetch()}>Reintentar</Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
         </>
       ) : (
         <>
@@ -359,6 +397,25 @@ function AdminPage() {
                   />
                 ))}
               </div>
+            ) : roomsQuery.isError ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                    <div className="space-y-1">
+                      <p className="font-semibold text-rose-700">
+                        Error al cargar habitaciones
+                      </p>
+                      <p className="text-sm text-rose-600">
+                        {(() => {
+                          const e = roomsQuery.error as unknown as ApiErrorResponse | Error | null;
+                          return e && 'message' in e ? e.message : 'Inténtalo de nuevo en unos momentos.';
+                        })()}
+                      </p>
+                    </div>
+                    <Button onClick={() => roomsQuery.refetch()}>Reintentar</Button>
+                  </div>
+                </CardContent>
+              </Card>
             ) : (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {(roomsQuery.data ?? []).map((room) => (

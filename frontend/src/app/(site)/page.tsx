@@ -16,21 +16,21 @@ import {
   Input,
   RoomCard,
   useToast,
-} from '../../components';
+} from '@/components';
 import {
   calculateNights,
   formatCurrency,
   formatDate,
   getTodayIso,
   getTomorrowIso,
-} from '../../lib/utils';
+} from '@/lib/utils';
 import {
   useAvailableRooms,
   useCreateReservation,
   useRooms,
-} from '../../hooks';
-import useAuth from '../../hooks/useAuth';
-import type { Room } from '../../types';
+} from '@/hooks';
+import useAuth from '@/hooks/useAuth';
+import type { ApiErrorResponse, Room } from '@/types';
 
 const searchSchema = z
   .object({
@@ -58,7 +58,7 @@ function HomePage() {
     fecha_fin: getTomorrowIso(),
   }), []);
 
-  const { register, handleSubmit, watch, setError, formState: { errors, isValid } } =
+  const { register, handleSubmit, watch, formState: { errors, isValid } } =
     useForm<SearchFormValues>({
       resolver: zodResolver(searchSchema),
       defaultValues: defaultDates,
@@ -72,6 +72,29 @@ function HomePage() {
 
   const allRooms = useRooms();
   const availableQuery = useAvailableRooms(paramsForQuery);
+
+  React.useEffect(() => {
+    if (availableQuery.isError) {
+      const err = availableQuery.error as unknown as ApiErrorResponse | Error | null;
+      const msg =
+        (err && 'message' in err ? err.message : undefined) ||
+        'No se pudo consultar la disponibilidad';
+      toast.error('Error al buscar disponibilidad', msg);
+    }
+    if (allRooms.isError) {
+      const err = allRooms.error as unknown as ApiErrorResponse | Error | null;
+      const msg =
+        (err && 'message' in err ? err.message : undefined) ||
+        'No se pudo cargar el inventario de habitaciones';
+      toast.error('Error al cargar habitaciones', msg);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    availableQuery.isError,
+    availableQuery.error,
+    allRooms.isError,
+    allRooms.error,
+  ]);
 
   function handleSearch(values: SearchFormValues) {
     setParamsForQuery(values);
@@ -91,38 +114,53 @@ function HomePage() {
         router.push(`/login?redirect=${encodeURIComponent('/')}`);
         return;
     }
+    if (!paramsForQuery) {
+      setParamsForQuery({ fecha_inicio: watchFechaInicio, fecha_fin: watchFechaFin });
+    }
     setSelectedRoom(room);
     setBookingDialogOpen(true);
   }
 
   async function confirmBooking() {
-    if (!selectedRoom || !paramsForQuery) return;
+    if (!selectedRoom) return;
+    const payload = paramsForQuery ?? {
+      fecha_inicio: watchFechaInicio,
+      fecha_fin: watchFechaFin,
+    };
+    if (!payload.fecha_inicio || !payload.fecha_fin) {
+      toast.warning('Fechas incompletas', 'Selecciona una fecha de llegada y salida válidas');
+      return;
+    }
     try {
       await createReservation.mutateAsync({
         habitacion_id: selectedRoom.id,
-        fecha_inicio: paramsForQuery.fecha_inicio,
-        fecha_fin: paramsForQuery.fecha_fin,
+        fecha_inicio: payload.fecha_inicio,
+        fecha_fin: payload.fecha_fin,
       });
       toast.success(
         '¡Reserva exitosa!',
         `Habitación ${selectedRoom.numero} reservada del ${formatDate(
-          paramsForQuery.fecha_inicio
-        )} al ${formatDate(paramsForQuery.fecha_fin)}`
+          payload.fecha_inicio
+        )} al ${formatDate(payload.fecha_fin)}`
       );
       setBookingDialogOpen(false);
       setSelectedRoom(null);
       router.push('/dashboard/mis-reservas');
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'No se pudo completar la reserva';
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'No se pudo completar la reserva';
       toast.error('Error al reservar', message);
     }
   }
 
   const totalEstimate =
-    selectedRoom && paramsForQuery
-      ? calculateNights(paramsForQuery.fecha_inicio, paramsForQuery.fecha_fin) *
-        Number(selectedRoom.precio_noche)
+    selectedRoom
+      ? calculateNights(
+          paramsForQuery?.fecha_inicio ?? watchFechaInicio,
+          paramsForQuery?.fecha_fin ?? watchFechaFin
+        ) * Number(selectedRoom.precio_noche)
       : 0;
 
   return (
@@ -286,7 +324,7 @@ function HomePage() {
           </>
         }
       >
-        {selectedRoom && paramsForQuery ? (
+        {selectedRoom ? (
           <div className="space-y-5">
             <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 text-2xl">
@@ -316,13 +354,13 @@ function HomePage() {
               <div>
                 <p className="text-xs uppercase tracking-wider text-slate-500">Llegada</p>
                 <p className="mt-1 font-medium text-slate-900">
-                  {formatDate(paramsForQuery.fecha_inicio)}
+                  {formatDate(paramsForQuery?.fecha_inicio ?? watchFechaInicio)}
                 </p>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wider text-slate-500">Salida</p>
                 <p className="mt-1 font-medium text-slate-900">
-                  {formatDate(paramsForQuery.fecha_fin)}
+                  {formatDate(paramsForQuery?.fecha_fin ?? watchFechaFin)}
                 </p>
               </div>
               <div>
