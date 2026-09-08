@@ -36,7 +36,8 @@ export const queryKeys = {
   },
   tags: {
     all: ['tags'] as const,
-    lists: () => [...queryKeys.tags.all, 'list'] as const,
+    lists: (params?: { keyword?: string; page?: number; limit?: number }) =>
+      [...queryKeys.tags.all, 'list', params ?? {}] as const,
     detail: (id: string) => [...queryKeys.tags.all, 'detail', id] as const,
   },
 } as const;

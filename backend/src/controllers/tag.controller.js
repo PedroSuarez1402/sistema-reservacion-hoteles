@@ -16,9 +16,19 @@ function serialize(tag) {
 export default {
   serialize,
 
-  // Obtiene lista de etiquetas, opcionalmente filtra por keyword
+  // Obtiene lista de etiquetas. Si page y/o limit vienen → paginado; sinó → lista completa (backwards compat)
   async index(req, res) {
-    const { keyword } = req.query || {};
+    const { keyword, page, limit } = req.query || {};
+    const hasPagination = page !== undefined || limit !== undefined;
+    if (hasPagination) {
+      const result = await TagService.getAllPaginated({ keyword, page, limit });
+      return res.json({
+        success: true,
+        message: 'Lista de etiquetas paginada cargada correctamente',
+        data: result.items.map(serialize),
+        meta: result.meta,
+      });
+    }
     const rows = await TagService.getAll({ keyword });
     res.json({
       success: true,

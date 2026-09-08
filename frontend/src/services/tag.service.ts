@@ -2,12 +2,18 @@ import { api } from './api';
 import type {
   ApiSuccessResponse,
   CreateTagPayload,
+  PaginatedResponse,
   Tag,
   UpdateTagPayload,
 } from '../types';
 
 interface TagService {
   getAll: (params?: { keyword?: string }) => Promise<Tag[]>;
+  getAllPaginated: (params?: {
+    keyword?: string;
+    page?: number;
+    limit?: number;
+  }) => Promise<PaginatedResponse<Tag>>;
   getById: (id: string) => Promise<Tag>;
   create: (payload: CreateTagPayload) => Promise<Tag>;
   update: (id: string, payload: UpdateTagPayload) => Promise<Tag>;
@@ -22,6 +28,28 @@ const tagService: TagService = {
       },
     });
     return response.data.data;
+  },
+
+  async getAllPaginated(params) {
+    const response = await api.get<ApiSuccessResponse<Tag[]>>('/tags', {
+      params: {
+        keyword: params?.keyword,
+        page: params?.page,
+        limit: params?.limit,
+      },
+    });
+    const meta = response.data.meta;
+    return {
+      items: response.data.data ?? [],
+      meta: {
+        total: Number(meta?.total) ?? 0,
+        page: Number(meta?.page) ?? 1,
+        perPage: Number(meta?.perPage) ?? 10,
+        totalPages: Number(meta?.totalPages) ?? 1,
+        hasNextPage: Boolean(meta?.hasNextPage),
+        hasPrevPage: Boolean(meta?.hasPrevPage),
+      },
+    };
   },
 
   async getById(id) {

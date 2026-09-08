@@ -13,4 +13,6 @@ export {
   CardFooter,
 } from './Card';
 export { Dialog } from './Dialog';
+export { Pagination } from './Pagination';
+export type { PaginationProps } from './Pagination';
 export { Toaster, useToast, useToastStore } from './Toast';

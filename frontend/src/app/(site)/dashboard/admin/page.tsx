@@ -23,6 +23,7 @@ import {
   CardTitle,
   Dialog,
   Input,
+  Pagination,
   ReservationTable,
   RoomCard,
   RoomModal,
@@ -39,7 +40,7 @@ import {
   useDeleteRoom,
   useDeleteTag,
   useRooms,
-  useTags,
+  useTagsPaginated,
   useUpdateReservationStatus,
   useUpdateRoom,
   useUpdateTag,
@@ -182,8 +183,13 @@ function RoomSummary({ rooms }: { rooms: Room[] }) {
   );
 }
 
-function TagSummary({ tags, rooms }: { tags: Tag[]; rooms: Room[] }) {
-  const totalTags = tags.length;
+function TagSummary({
+  totalTags,
+  rooms,
+}: {
+  totalTags: number;
+  rooms: Room[];
+}) {
   const taggedRooms = rooms.filter(
     (r) => Array.isArray(r.etiquetas) && r.etiquetas.length > 0
   ).length;
@@ -191,9 +197,13 @@ function TagSummary({ tags, rooms }: { tags: Tag[]; rooms: Room[] }) {
     rooms.length > 0
       ? rooms.reduce((acc, r) => acc + ((r.etiquetas?.length) ?? 0), 0) / rooms.length
       : 0;
-  const unusedTags = tags.filter((t) => {
-    return !rooms.some((r) => (r.etiquetas ?? []).some((rt) => rt.id === t.id));
-  }).length;
+  const usedTagIds = new Set<string>();
+  rooms.forEach((r) => {
+    (r.etiquetas ?? []).forEach((t) => {
+      if (t?.id) usedTagIds.add(t.id);
+    });
+  });
+  const unusedTags = Math.max(0, totalTags - usedTagIds.size);
 
   const cards = [
     {
@@ -267,7 +277,6 @@ function AdminPage() {
   const [roomEditing, setRoomEditing] = React.useState<Room | null>(null);
   const [confirmDeleteRoom, setConfirmDeleteRoom] = React.useState<Room | null>(null);
 
-  const tagsQuery = useTags();
   const createTagMutation = useCreateTag();
   const updateTagMutation = useUpdateTag();
   const deleteTagMutation = useDeleteTag();
@@ -276,6 +285,18 @@ function AdminPage() {
   const [tagEditing, setTagEditing] = React.useState<Tag | null>(null);
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState<Tag | null>(null);
   const [tagSearch, setTagSearch] = React.useState('');
+  const [tagPage, setTagPage] = React.useState(1);
+  const tagLimit = 8;
+
+  const tagsQuery = useTagsPaginated({
+    keyword: tagSearch,
+    page: tagPage,
+    limit: tagLimit,
+  });
+
+  React.useEffect(() => {
+    setTagPage(1);
+  }, [tagSearch]);
 
   React.useEffect(() => {
     if (reservationsQuery.isError) {
@@ -430,17 +451,6 @@ function AdminPage() {
       toast.error('Error al eliminar etiqueta', message);
     }
   }
-
-  const filteredTags = React.useMemo(() => {
-    const base = tagsQuery.data ?? [];
-    const kw = tagSearch.trim().toLowerCase();
-    if (!kw) return base;
-    return base.filter(
-      (t) =>
-        t.nombre.toLowerCase().includes(kw) ||
-        (t.descripcion ?? '').toLowerCase().includes(kw)
-    );
-  }, [tagsQuery.data, tagSearch]);
 
   const tabs: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
     {
@@ -601,7 +611,10 @@ function AdminPage() {
         </>
       ) : (
         <>
-          <TagSummary tags={tagsQuery.data ?? []} rooms={roomsQuery.data ?? []} />
+          <TagSummary
+            totalTags={tagsQuery.data?.meta.total ?? 0}
+            rooms={roomsQuery.data ?? []}
+          />
           <section>
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -649,7 +662,7 @@ function AdminPage() {
                   </div>
                 </CardContent>
               </Card>
-            ) : filteredTags.length === 0 ? (
+            ) : (tagsQuery.data?.items.length ?? 0) === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
                   <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 ring-1 ring-primary-100">
@@ -675,61 +688,73 @@ function AdminPage() {
                 </CardContent>
               </Card>
             ) : (
-              <Card>
-                <CardContent className="divide-y divide-slate-100 p-0">
-                  {filteredTags.map((tag) => {
-                    const usageCount = (roomsQuery.data ?? []).filter((r) =>
-                      (r.etiquetas ?? []).some((rt) => rt.id === tag.id)
-                    ).length;
-                    return (
-                      <div
-                        key={tag.id}
-                        className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="flex min-w-0 items-start gap-3">
-                          <Badge variant="default" className="shrink-0">
-                            <TagIcon className="mr-1 h-3 w-3" aria-hidden="true" />
-                            {tag.nombre}
-                          </Badge>
-                          <div className="min-w-0 space-y-0.5">
-                            {tag.descripcion ? (
-                              <p className="text-sm text-slate-600 line-clamp-2">
-                                {tag.descripcion}
+              <div className="space-y-3">
+                <Card>
+                  <CardContent className="divide-y divide-slate-100 p-0">
+                    {(tagsQuery.data?.items ?? []).map((tag: Tag) => {
+                      const usageCount = (roomsQuery.data ?? []).filter((r) =>
+                        (r.etiquetas ?? []).some((rt) => rt.id === tag.id)
+                      ).length;
+                      return (
+                        <div
+                          key={tag.id}
+                          className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="flex min-w-0 items-start gap-3">
+                            <Badge variant="default" className="shrink-0">
+                              <TagIcon className="mr-1 h-3 w-3" aria-hidden="true" />
+                              {tag.nombre}
+                            </Badge>
+                            <div className="min-w-0 space-y-0.5">
+                              {tag.descripcion ? (
+                                <p className="text-sm text-slate-600 line-clamp-2">
+                                  {tag.descripcion}
+                                </p>
+                              ) : (
+                                <p className="text-xs italic text-slate-400">
+                                  Sin descripción administrativa
+                                </p>
+                              )}
+                              <p className="text-xs text-slate-500">
+                                Asignada a{' '}
+                                <span className="font-medium text-slate-700">{usageCount}</span>{' '}
+                                habitacione{usageCount === 1 ? '' : 's'}
                               </p>
-                            ) : (
-                              <p className="text-xs italic text-slate-400">
-                                Sin descripción administrativa
-                              </p>
-                            )}
-                            <p className="text-xs text-slate-500">
-                              Asignada a <span className="font-medium text-slate-700">{usageCount}</span>{' '}
-                              habitacione{usageCount === 1 ? '' : 's'}
-                            </p>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 gap-2 sm:justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              leftIcon={<Pencil className="h-4 w-4" />}
+                              onClick={() => openEditTag(tag)}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              leftIcon={<Trash2 className="h-4 w-4" />}
+                              onClick={() => setConfirmDeleteTag(tag)}
+                            >
+                              Eliminar
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex shrink-0 gap-2 sm:justify-end">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            leftIcon={<Pencil className="h-4 w-4" />}
-                            onClick={() => openEditTag(tag)}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            leftIcon={<Trash2 className="h-4 w-4" />}
-                            onClick={() => setConfirmDeleteTag(tag)}
-                          >
-                            Eliminar
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+                <Pagination
+                  page={tagsQuery.data?.meta.page ?? tagPage}
+                  totalPages={tagsQuery.data?.meta.totalPages ?? 1}
+                  totalItems={tagsQuery.data?.meta.total}
+                  perPage={tagsQuery.data?.meta.perPage ?? tagLimit}
+                  onChange={(p) => setTagPage(p)}
+                  isFetching={tagsQuery.isFetching}
+                  showInfo={true}
+                />
+              </div>
             )}
           </section>
         </>

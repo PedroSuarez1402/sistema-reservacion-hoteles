@@ -22,10 +22,28 @@ async function sanitizePayload(payload, { excludeId = null } = {}) {
   };
 }
 
-// Obtiene todas las etiquetas, opcional filtro keyword
+// Obtiene todas las etiquetas, opcional filtro keyword (sin paginar, para TagSelector)
 async function getAll({ keyword } = {}) {
   const rows = await TagRepository.findAll({ keyword });
   return rows.map((r) => r.get({ plain: true }));
+}
+
+// Obtiene etiquetas paginadas + metadatos (para tabla Dashboard Admin)
+async function getAllPaginated({ keyword, page, limit } = {}) {
+  const result = await TagRepository.findAndCountAllPaginated({ keyword, page, limit });
+  const totalItems = Number(result.count) || 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / result.limit));
+  return {
+    items: result.rows.map((r) => r.get({ plain: true })),
+    meta: {
+      total: totalItems,
+      page: result.page,
+      perPage: result.limit,
+      totalPages,
+      hasNextPage: result.page < totalPages,
+      hasPrevPage: result.page > 1,
+    },
+  };
 }
 
 // Obtiene etiqueta por ID o lanza 404
@@ -62,6 +80,7 @@ async function remove(id) {
 // Objeto exportado servicio Etiquetas
 export default {
   getAll,
+  getAllPaginated,
   getById,
   create,
   update,
