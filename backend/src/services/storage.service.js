@@ -117,8 +117,11 @@ export async function processImageBuffer(buffer, pathsObj, mime) {
 
 export function resolvePublicUrl(relativePath) {
   if (!relativePath) return '';
-  const clean = String(relativePath).replace(/^\/+/, '');
-  return `/api/v1/uploads/${clean}`;
+  let clean = String(relativePath).replace(/^\/+/, '');
+  if (clean.startsWith('uploads/')) {
+    clean = clean.slice('uploads/'.length);
+  }
+  return `/api/uploads/${clean}`;
 }
 
 export default {
