@@ -3,6 +3,8 @@ import User from './User.js';
 import Room from './Room.js';
 import Reservation from './Reservation.js';
 import RoomImage from './RoomImage.js';
+import Tag from './Tag.js';
+import HabitacionEtiqueta from './HabitacionEtiqueta.js';
 
 User.hasMany(Reservation, {
   foreignKey: 'usuario_id',
@@ -34,4 +36,29 @@ RoomImage.belongsTo(Room, {
   as: 'habitacion',
 });
 
-export { sequelize, testConnection, User, Room, Reservation, RoomImage };
+Room.belongsToMany(Tag, {
+  through: HabitacionEtiqueta,
+  as: 'etiquetas',
+  foreignKey: 'habitacion_id',
+  otherKey: 'etiqueta_id',
+  onDelete: 'CASCADE',
+});
+
+Tag.belongsToMany(Room, {
+  through: HabitacionEtiqueta,
+  as: 'habitaciones',
+  foreignKey: 'etiqueta_id',
+  otherKey: 'habitacion_id',
+  onDelete: 'CASCADE',
+});
+
+export {
+  sequelize,
+  testConnection,
+  User,
+  Room,
+  Reservation,
+  RoomImage,
+  Tag,
+  HabitacionEtiqueta,
+};

@@ -4,10 +4,12 @@ import { UnauthorizedError, ForbiddenError } from '../utils/errors.util.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'secret_key_change_in_production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
+// Firma token JWT con payload y expiración
 export function signToken(payload) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
+// Middleware: verifica token JWT y adjunta req.user
 export function verifyToken(req, res, next) {
   try {
     const authHeader = req.headers['authorization'] || req.headers['Authorization'];
@@ -46,7 +48,9 @@ export function verifyToken(req, res, next) {
   }
 }
 
+// Factory middleware: valida que rol usuario esté en lista permitida
 export function requireRole(...allowedRoles) {
+  // Middleware interno: chequea rol contra lista
   return function checkRole(req, res, next) {
     try {
       if (!req.user) {
@@ -62,6 +66,7 @@ export function requireRole(...allowedRoles) {
   };
 }
 
+// Middleware: verifica que usuario tenga rol ADMIN
 export function isAdmin(req, res, next) {
   try {
     if (!req.user) {
@@ -76,6 +81,7 @@ export function isAdmin(req, res, next) {
   }
 }
 
+// Middleware: verifica rol RECEPCION o ADMIN
 export function isRecepcionOrAdmin(req, res, next) {
   try {
     if (!req.user) {
@@ -90,7 +96,9 @@ export function isRecepcionOrAdmin(req, res, next) {
   }
 }
 
+// Factory middleware: permite dueño recurso o ADMIN
 export function isOwnerOrAdmin(getOwnerIdFn) {
+  // Middleware interno: valida ownership o rol admin
   return function checkOwner(req, res, next) {
     try {
       if (!req.user) {
@@ -112,6 +120,7 @@ export function isOwnerOrAdmin(getOwnerIdFn) {
   };
 }
 
+// Objeto exportado middleware Autenticación Autorización
 export default {
   signToken,
   verifyToken,

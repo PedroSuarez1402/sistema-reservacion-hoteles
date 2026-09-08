@@ -48,6 +48,7 @@ app.use(
   express.static(UPLOADS_DIR, {
     maxAge: '1y',
     immutable: true,
+    // Configura headers cache para imágenes
     setHeaders(res, filePath) {
       if (filePath.match(/\.(jpe?g|png|webp)$/i)) {
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -68,6 +69,7 @@ const apiLimiter = rateLimit({
 });
 app.use('/api', apiLimiter);
 
+// Ruta raíz: información y endpoints API
 app.get('/', (req, res) => {
   res.json({
     nombre: 'Sistema de Reservaciones de Hoteles - API',
@@ -84,6 +86,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/v1', routes);
 
+// Middleware: maneja rutas no encontradas 404
 app.use((req, res, next) => {
   res.status(404).json({
     status: 'error',

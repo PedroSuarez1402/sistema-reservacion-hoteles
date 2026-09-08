@@ -2,6 +2,7 @@ import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database.js';
 import Reservation from './Reservation.js';
 
+// Modelo Sequelize Habitación
 class Room extends Model {}
 
 Room.init(
@@ -29,12 +30,18 @@ Room.init(
       defaultValue: 'ACTIVA',
       allowNull: false,
     },
+    descripcion: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+      defaultValue: '',
+    },
   },
   {
     sequelize,
     modelName: 'Room',
     tableName: 'habitaciones',
     hooks: {
+      // Hook: elimina carpeta imágenes al borrar habitación
       async afterDestroy(instance) {
         try {
           const { deleteRoomFolder } = await import('../services/storage.service.js');

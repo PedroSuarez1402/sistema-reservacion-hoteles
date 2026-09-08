@@ -5,12 +5,13 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Button, Dialog, Input, Select } from './ui';
+import { Button, Dialog, Input, Select, Textarea } from './ui';
 import { Badge } from './ui/Badge';
 import type { SelectOption } from './ui/Select';
 import type { CreateRoomPayload, Room, RoomImage, UpdateRoomPayload } from '../types';
 import { RoomImageUploader } from './RoomImageUploader';
 import { RoomImageGrid } from './RoomImageGrid';
+import { TagSelector } from './TagSelector';
 import { cn } from '../lib/utils';
 import { Lightbulb } from 'lucide-react';
 
@@ -37,6 +38,15 @@ const createRoomSchema = z.object({
   estado: z.enum(['ACTIVA', 'MANTENIMIENTO', 'ELIMINADA'], {
     required_error: 'Selecciona un estado',
   }),
+  descripcion: z
+    .string()
+    .min(10, 'La descripción debe tener al menos 10 caracteres')
+    .max(2000, 'La descripción no puede exceder 2000 caracteres')
+    .trim(),
+  tag_ids: z
+    .array(z.string().uuid('Identificador de etiqueta inválido'))
+    .max(20, 'Máximo 20 etiquetas por habitación')
+    .optional(),
 });
 
 export type RoomFormValues = z.infer<typeof createRoomSchema>;
@@ -72,6 +82,8 @@ function RoomModal({
         tipo: 'SENCILLA',
         precio_noche: undefined as unknown as number,
         estado: 'ACTIVA',
+        descripcion: '',
+        tag_ids: [],
       },
       mode: 'onTouched',
     });
@@ -83,18 +95,26 @@ function RoomModal({
       setValue('tipo', initialValue.tipo);
       setValue('precio_noche', Number(initialValue.precio_noche));
       setValue('estado', initialValue.estado);
+      setValue('descripcion', initialValue.descripcion ?? '');
+      const tags = initialValue.etiquetas ?? [];
+      setValue(
+        'tag_ids',
+        tags.map((t) => t.id)
+      );
     } else {
       reset({
         numero: '',
         tipo: 'SENCILLA',
         precio_noche: undefined as unknown as number,
         estado: 'ACTIVA',
+        descripcion: '',
+        tag_ids: [],
       });
     }
   }, [open, initialValue, setValue, reset]);
 
   const modo = initialValue ? 'edit' : 'create';
-  const dialogSize: 'md' | 'lg' | 'xl' = initialValue ? 'lg' : 'md';
+  const dialogSize: 'md' | 'lg' | 'xl' = initialValue ? 'lg' : 'lg';
   const images: RoomImage[] | undefined = initialValue?.imagenes as RoomImage[] | undefined;
 
   async function handleValidSubmit(values: RoomFormValues) {
@@ -102,6 +122,8 @@ function RoomModal({
       numero: values.numero.trim(),
       tipo: values.tipo,
       precio_noche: Number(values.precio_noche),
+      descripcion: values.descripcion.trim(),
+      tag_ids: values.tag_ids ?? [],
     };
     if (allowStatusEdit && initialValue) {
       (payload as UpdateRoomPayload).estado = values.estado;
@@ -109,6 +131,8 @@ function RoomModal({
     if (initialValue) payload.id = initialValue.id;
     await onSubmit(payload);
   }
+
+  const watchTagIds = watch('tag_ids') ?? [];
 
   return (
     <Dialog
@@ -118,7 +142,7 @@ function RoomModal({
       description={
         modo === 'create'
           ? 'Ingresa los datos para registrar una nueva habitación en el inventario.'
-          : 'Actualiza los datos y la galería de imágenes de la habitación seleccionada.'
+          : 'Actualiza los datos, la galería de imágenes y las etiquetas de la habitación seleccionada.'
       }
       size={dialogSize}
       footer={
@@ -176,6 +200,26 @@ function RoomModal({
               error={errors.estado?.message}
             />
           ) : null}
+
+          <div className="sm:col-span-2">
+            <Textarea
+              label="Descripción detallada"
+              placeholder="Describe comodidades, ambiente y detalles específicos de esta habitación (ej. vista al jardín, piso alto, acceso a terraza...)."
+              rows={4}
+              error={errors.descripcion?.message}
+              {...register('descripcion')}
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <TagSelector
+              label="Etiquetas y características"
+              value={watchTagIds}
+              onChange={(next) => setValue('tag_ids', next, { shouldValidate: true })}
+              error={errors.tag_ids?.message as string | undefined}
+              hint="Selecciona las características que describen esta habitación. Crea nuevas etiquetas si falta alguna."
+            />
+          </div>
         </form>
 
         <div

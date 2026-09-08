@@ -1,6 +1,7 @@
 import sequelize from './src/config/database.js';
 import './src/models/index.js';
 
+// Sincroniza modelos Sequelize con BD
 async function sync() {
   try {
     await sequelize.authenticate();

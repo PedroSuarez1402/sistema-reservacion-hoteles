@@ -215,8 +215,24 @@ export function getRoomDescripcion(
 }
 
 export function getRoomAmenidades(
-  room: { tipo: string; amenidades?: string[] } | undefined | null
+  room:
+    | {
+        tipo: string;
+        amenidades?: string[];
+        etiquetas?: Array<{ nombre: string } | string> | null;
+      }
+    | undefined
+    | null
 ): string[] {
+  if (
+    Array.isArray(room?.etiquetas) &&
+    (room!.etiquetas as Array<unknown>).length > 0
+  ) {
+    const fromTags = (room!.etiquetas as Array<unknown>)
+      .map((t) => (typeof t === 'string' ? t : (t as { nombre?: string }).nombre))
+      .filter((x): x is string => Boolean(x && typeof x === 'string' && x.trim().length > 0));
+    if (fromTags.length > 0) return fromTags;
+  }
   if (Array.isArray(room?.amenidades) && room!.amenidades.length > 0) {
     return room!.amenidades;
   }
@@ -224,7 +240,16 @@ export function getRoomAmenidades(
   return roomTypeMedia[tipo]?.amenidades ?? roomTypeMedia.SENCILLA.amenidades;
 }
 
-export function enrichRoomWithMedia<T extends { tipo: string; numero: string; imagenes?: RoomImage[] | string[] }>(
+export function enrichRoomWithMedia<
+  T extends {
+    tipo: string;
+    numero: string;
+    imagenes?: RoomImage[] | string[];
+    descripcion?: string | null;
+    amenidades?: string[];
+    etiquetas?: Array<{ nombre: string } | string> | null;
+  }
+>(
   room: T
 ): T & { imagenes: string[]; descripcion: string; amenidades: string[] } {
   const realUrls = extractRoomImageUrls(room);
@@ -242,11 +267,24 @@ export function enrichRoomWithMedia<T extends { tipo: string; numero: string; im
     }))
     .sort((a, b) => a.score - b.score)
     .map(({ url }) => url);
+  const hasEtiquetas =
+    Array.isArray(room.etiquetas) &&
+    (room.etiquetas as Array<unknown>).some((t) =>
+      typeof t === 'string' ? Boolean(t) : Boolean((t as { nombre?: string })?.nombre)
+    );
+  const hasAmenidades = Array.isArray(room.amenidades) && room.amenidades.length > 0;
+  const resolvedAmenidades: string[] = hasEtiquetas
+    ? getRoomAmenidades(room)
+    : hasAmenidades
+      ? room.amenidades!
+      : media.amenidades;
   return {
     ...room,
     imagenes: hasReal ? realUrls : shuffled,
-    descripcion: (room as any).descripcion || media.descripcion,
-    amenidades: (room as any).amenidades || media.amenidades,
+    descripcion: (room.descripcion && room.descripcion.trim().length > 0
+      ? room.descripcion
+      : media.descripcion) as string,
+    amenidades: resolvedAmenidades,
   };
 }
 

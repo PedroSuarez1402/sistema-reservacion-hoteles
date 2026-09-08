@@ -1,6 +1,7 @@
 import RoomImageService from '../services/roomImage.service.js';
 import { resolvePublicUrl } from '../services/storage.service.js';
 
+// Serializa imagen y genera URLs públicas
 function serialize(img) {
   if (!img) return null;
   const plain = typeof img.toJSON === 'function' ? img.toJSON() : { ...img };
@@ -12,7 +13,9 @@ function serialize(img) {
   };
 }
 
+// Objeto exportado controlador Imágenes Habitación
 export default {
+  // Sube múltiples imágenes para una habitación
   async uploadImages(req, res, next) {
     try {
       const { habitacionId } = req.params;
@@ -28,6 +31,7 @@ export default {
     }
   },
 
+  // Reordena imágenes de una habitación según IDs
   async reorder(req, res, next) {
     try {
       const { habitacionId } = req.params;
@@ -43,6 +47,7 @@ export default {
     }
   },
 
+  // Establece imagen principal de una habitación
   async setMain(req, res, next) {
     try {
       const { habitacionId, id } = req.params;
@@ -57,6 +62,7 @@ export default {
     }
   },
 
+  // Elimina una imagen de habitación por su ID
   async remove(req, res, next) {
     try {
       const { habitacionId, id } = req.params;

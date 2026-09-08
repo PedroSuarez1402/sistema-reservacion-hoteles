@@ -48,3 +48,10 @@ export {
   CACHE_TIMES,
 } from './query';
 export type { UseMeOptions, QueryKeyFactory } from './query';
+export { useTags, useCreateTag, useUpdateTag, useDeleteTag } from './useTags';
+export type {
+  UseTagsOptions,
+  UseCreateTagOptions,
+  UseUpdateTagOptions,
+  UseDeleteTagOptions,
+} from './useTags';

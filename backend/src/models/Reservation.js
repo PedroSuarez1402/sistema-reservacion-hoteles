@@ -2,6 +2,7 @@ import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database.js';
 import Room from './Room.js';
 
+// Modelo Sequelize Reservación
 class Reservation extends Model {}
 
 Reservation.init(
@@ -59,6 +60,7 @@ Reservation.init(
       },
     ],
     validate: {
+      // Valida fecha fin sea mayor que inicio
       fechaFinMayorQueInicio() {
         const inicio = new Date(this.fecha_inicio);
         const fin = new Date(this.fecha_fin);
@@ -68,6 +70,7 @@ Reservation.init(
       },
     },
     hooks: {
+      // Hook: calcula precio_total según noches y precio habitación
       beforeCreate: async (reservation) => {
         const room = await Room.findByPk(reservation.habitacion_id);
         if (!room) {

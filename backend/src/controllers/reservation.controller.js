@@ -1,7 +1,9 @@
 import ReservationService from '../services/reservation.service.js';
 import { ForbiddenError } from '../utils/errors.util.js';
 
+// Controlador peticiones HTTP Reservaciones
 class ReservationController {
+  // Obtiene lista todas las reservaciones
   static async getAll(req, res, next) {
     try {
       const reservas = await ReservationService.getAllReservations();
@@ -15,6 +17,7 @@ class ReservationController {
     }
   }
 
+  // Obtiene reservaciones del usuario autenticado
   static async getMyReservations(req, res, next) {
     try {
       const usuario_id = req.user.id;
@@ -29,6 +32,7 @@ class ReservationController {
     }
   }
 
+  // Obtiene una reservación por su ID con validación permisos
   static async getById(req, res, next) {
     try {
       const { id } = req.params;
@@ -50,6 +54,7 @@ class ReservationController {
     }
   }
 
+  // Crea una nueva reservación
   static async create(req, res, next) {
     try {
       const { habitacion_id, fecha_inicio, fecha_fin, estado } = req.body;
@@ -73,6 +78,7 @@ class ReservationController {
     }
   }
 
+  // Actualiza datos de una reservación existente
   static async update(req, res, next) {
     try {
       const { id } = req.params;
@@ -94,6 +100,7 @@ class ReservationController {
     }
   }
 
+  // Cancela una reservación existente
   static async cancel(req, res, next) {
     try {
       const { id } = req.params;
@@ -108,6 +115,7 @@ class ReservationController {
     }
   }
 
+  // Elimina una reservación por su ID
   static async remove(req, res, next) {
     try {
       const { id } = req.params;

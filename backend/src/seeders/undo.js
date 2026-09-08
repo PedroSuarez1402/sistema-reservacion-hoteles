@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import Room from '../models/Room.js';
 import Reservation from '../models/Reservation.js';
 
+// Limpia datos BD truncando tablas principales
 async function runUndo() {
   try {
     console.log('========================================');

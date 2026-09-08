@@ -15,12 +15,14 @@ const WEB_QUALITY = 82;
 const THUMB_MAX_WIDTH = 320;
 const THUMB_QUALITY = 80;
 
+// Crea directorio de forma recursiva si no existe
 function ensureDirSync(dirPath) {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
 }
 
+// Crea estructura carpetas para imágenes de habitación
 export function ensureRoomDir(roomId) {
   const base = path.join(ROOMS_UPLOADS, String(roomId));
   const original = path.join(base, 'original');
@@ -32,6 +34,7 @@ export function ensureRoomDir(roomId) {
   return { base, original, web, thumb };
 }
 
+// Limpia y normaliza nombre de archivo (sin acentos, seguro)
 export function sanitizeFilename(original) {
   if (!original) return 'archivo';
   let name = String(original);
@@ -48,6 +51,7 @@ export function sanitizeFilename(original) {
   return ext ? `${safe}.${ext}` : safe;
 }
 
+// Genera rutas absolutas y relativas almacenamiento imagen
 export function generateStoragePaths(roomId, ext) {
   const dirs = ensureRoomDir(roomId);
   const uuid = randomUUID();
@@ -67,6 +71,7 @@ export function generateStoragePaths(roomId, ext) {
   };
 }
 
+// Elimina archivo físico si existe, ignora errores
 export function deleteIfExists(absPath) {
   try {
     if (absPath && fs.existsSync(absPath)) {
@@ -77,6 +82,7 @@ export function deleteIfExists(absPath) {
   }
 }
 
+// Elimina 3 versiones archivos imagen (original, web, thumb)
 export function deleteRoomImageFiles(pathsObj) {
   if (!pathsObj) return;
   if (pathsObj.originalAbs) deleteIfExists(pathsObj.originalAbs);
@@ -84,6 +90,7 @@ export function deleteRoomImageFiles(pathsObj) {
   if (pathsObj.thumbAbs) deleteIfExists(pathsObj.thumbAbs);
 }
 
+// Elimina carpeta completa y contenido de habitación
 export function deleteRoomFolder(roomId) {
   if (!roomId) return;
   const base = path.join(ROOMS_UPLOADS, String(roomId));
@@ -96,6 +103,7 @@ export function deleteRoomFolder(roomId) {
   }
 }
 
+// Procesa buffer imagen: guarda original, web y miniatura
 export async function processImageBuffer(buffer, pathsObj, mime) {
   const isPng = mime === 'image/png';
   const sharpInst = sharp(buffer, { failOnError: false }).rotate();
@@ -115,6 +123,7 @@ export async function processImageBuffer(buffer, pathsObj, mime) {
   ]);
 }
 
+// Convierte ruta relativa a URL pública endpoint /api/uploads
 export function resolvePublicUrl(relativePath) {
   if (!relativePath) return '';
   let clean = String(relativePath).replace(/^\/+/, '');
@@ -124,6 +133,7 @@ export function resolvePublicUrl(relativePath) {
   return `/api/uploads/${clean}`;
 }
 
+// Objeto exportado servicio Almacenamiento Archivos
 export default {
   ensureRoomDir,
   sanitizeFilename,

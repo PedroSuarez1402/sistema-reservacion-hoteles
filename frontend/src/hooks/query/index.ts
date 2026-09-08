@@ -3,3 +3,4 @@ export type { QueryKeyFactory } from './queryKeys';
 export * from './useRooms';
 export * from './useReservations';
 export * from './useAuth';
+export * from './useTags';

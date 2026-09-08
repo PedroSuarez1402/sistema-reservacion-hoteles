@@ -3,11 +3,14 @@ import Reservation from '../models/Reservation.js';
 import User from '../models/User.js';
 import Room from '../models/Room.js';
 
+// Repositorio acceso datos Reservaciones
 class ReservationRepository {
+  // Crea nueva reservación en BD
   static async create(data) {
     return await Reservation.create(data);
   }
 
+  // Obtiene lista reservaciones con includes usuario/habitación
   static async getAll(options = {}) {
     const {
       where = {},
@@ -37,6 +40,7 @@ class ReservationRepository {
     return await Reservation.findAll({ where, order, include, limit, offset });
   }
 
+  // Obtiene reservación por ID con includes opcionales
   static async getById(id, options = {}) {
     const { includeUser = true, includeRoom = true } = options;
     const include = [];
@@ -55,10 +59,12 @@ class ReservationRepository {
     return await Reservation.findByPk(id, { include });
   }
 
+  // Alias findById = getById
   static async findById(id, options) {
     return await this.getById(id, options);
   }
 
+  // Obtiene reservaciones de un usuario por ID
   static async getByUsuarioId(usuario_id, options = {}) {
     const { order = [['fecha_inicio', 'DESC']], includeRoom = true } = options;
     const include = [];
@@ -75,6 +81,7 @@ class ReservationRepository {
     });
   }
 
+  // Obtiene reservaciones de una habitación por ID
   static async getByHabitacionId(habitacion_id, options = {}) {
     const { order = [['fecha_inicio', 'DESC']], includeUser = true } = options;
     const include = [];
@@ -91,12 +98,14 @@ class ReservationRepository {
     });
   }
 
+  // Actualiza reservación existente por ID
   static async update(id, data) {
     const reservation = await this.getById(id, { includeUser: false, includeRoom: false });
     if (!reservation) return null;
     return await reservation.update(data);
   }
 
+  // Elimina reservación por ID (destroy)
   static async delete(id) {
     const reservation = await this.getById(id, { includeUser: false, includeRoom: false });
     if (!reservation) return null;
@@ -104,11 +113,13 @@ class ReservationRepository {
     return reservation;
   }
 
+  // Verifica si existe reservación por ID
   static async exists(id) {
     const count = await Reservation.count({ where: { id } });
     return count > 0;
   }
 
+  // Actualiza solo campo estado de reservación
   static async updateStatus(id, estado) {
     const reservation = await this.getById(id, { includeUser: false, includeRoom: false });
     if (!reservation) return null;
@@ -117,6 +128,7 @@ class ReservationRepository {
     return await this.getById(id);
   }
 
+  // Verifica disponibilidad: devuelve true si no hay solapamientos
   static async checkAvailability(habitacion_id, fechaInicio, fechaFin, excludeReservationId = null) {
     const inicio = new Date(fechaInicio);
     const fin = new Date(fechaFin);
@@ -136,6 +148,7 @@ class ReservationRepository {
     return count === 0;
   }
 
+  // Busca reservaciones que se solapan en rango fechas
   static async findOverlapping(habitacion_id, fechaInicio, fechaFin, excludeReservationId = null) {
     const inicio = new Date(fechaInicio);
     const fin = new Date(fechaFin);
@@ -154,6 +167,7 @@ class ReservationRepository {
     return await Reservation.findAll({ where: whereClause });
   }
 
+  // Obtiene reservaciones dentro de rango fechas dado
   static async getByDateRange(fechaInicio, fechaFin, options = {}) {
     const {
       estado,
@@ -184,11 +198,13 @@ class ReservationRepository {
     return await Reservation.findAll({ where, include, order });
   }
 
+  // Cuenta reservaciones filtradas por estado
   static async countByEstado(estado) {
     const where = estado ? { estado } : {};
     return await Reservation.count({ where });
   }
 
+  // Obtiene estadísticas conteo por cada estado
   static async getStats() {
     const [pendientes, confirmadas, canceladas, finalizadas, total] = await Promise.all([
       this.countByEstado('PENDIENTE'),

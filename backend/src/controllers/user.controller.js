@@ -5,7 +5,9 @@ import {
   ForbiddenError,
 } from '../utils/errors.util.js';
 
+// Controlador peticiones HTTP Usuarios
 class UserController {
+  // Obtiene lista todos los usuarios
   static async getAll(req, res, next) {
     try {
       const users = await UserService.getAll();
@@ -19,6 +21,7 @@ class UserController {
     }
   }
 
+  // Obtiene un usuario por su ID
   static async getById(req, res, next) {
     try {
       const { id } = req.params;
@@ -38,6 +41,7 @@ class UserController {
     }
   }
 
+  // Crea un nuevo usuario y genera token
   static async create(req, res, next) {
     try {
       const user = await UserService.create(req.body);
@@ -62,6 +66,7 @@ class UserController {
     }
   }
 
+  // Inicia sesión: valida credenciales y devuelve token
   static async login(req, res, next) {
     try {
       const { email, password } = req.body;
@@ -90,6 +95,7 @@ class UserController {
     }
   }
 
+  // Obtiene perfil del usuario autenticado
   static async me(req, res, next) {
     try {
       const user = await UserService.getById(req.user.id);
@@ -108,6 +114,7 @@ class UserController {
     }
   }
 
+  // Actualiza datos de un usuario existente
   static async update(req, res, next) {
     try {
       const { id } = req.params;
@@ -135,6 +142,7 @@ class UserController {
     }
   }
 
+  // Elimina un usuario por su ID
   static async remove(req, res, next) {
     try {
       const { id } = req.params;

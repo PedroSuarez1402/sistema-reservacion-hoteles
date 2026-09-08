@@ -10,6 +10,7 @@ const config = {
 
 const DB_NAME = process.env.DB_NAME || 'sistema-reservas';
 
+// Verifica y crea base de datos si no existe
 async function ensureDb() {
   try {
     const conn = await mysql.createConnection(config);

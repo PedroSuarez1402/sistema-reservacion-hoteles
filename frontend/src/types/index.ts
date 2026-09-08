@@ -10,6 +10,14 @@ export type ReservationStatus =
   | 'CANCELADA'
   | 'FINALIZADA';
 
+export interface Tag {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface User {
   id: string;
   nombre: string;
@@ -46,6 +54,7 @@ export interface Room {
   imagenes?: RoomImage[];
   descripcion?: string;
   amenidades?: string[];
+  etiquetas?: Tag[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -122,16 +131,30 @@ export interface UpdateRoomPayload {
   tipo?: RoomType;
   precio_noche?: number;
   estado?: RoomStatus;
+  descripcion?: string;
+  tag_ids?: string[];
 }
 
 export interface CreateRoomPayload {
   numero: string;
   tipo: RoomType;
   precio_noche: number;
+  descripcion: string;
+  tag_ids?: string[];
 }
 
 export interface UpdateReservationStatusPayload {
   estado: ReservationStatus;
+}
+
+export interface CreateTagPayload {
+  nombre: string;
+  descripcion?: string;
+}
+
+export interface UpdateTagPayload {
+  nombre?: string;
+  descripcion?: string | null;
 }
 
 export type UploadImageProgressCb = (file: File, percent: number) => void;

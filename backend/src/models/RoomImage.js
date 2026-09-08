@@ -1,6 +1,7 @@
 import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database.js';
 
+// Modelo Sequelize Imagen de Habitación
 class RoomImage extends Model {}
 
 RoomImage.init(

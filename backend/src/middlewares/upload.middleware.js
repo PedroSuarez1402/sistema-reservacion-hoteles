@@ -19,12 +19,14 @@ const MIME_TO_EXT = {
 
 const memoryStorage = multer.memoryStorage();
 
+// Instancia multer configurada para subir imágenes habitación
 const multerRoomImages = multer({
   storage: memoryStorage,
   limits: {
     fileSize: MAX_BYTES_PER_FILE,
     files: MAX_FILES,
   },
+  // Filtra archivos por extensión y MIME type permitidos
   fileFilter(req, file, cb) {
     const mime = String(file.mimetype || '').toLowerCase();
     const name = String(file.originalname || '').toLowerCase();
@@ -41,8 +43,10 @@ const multerRoomImages = multer({
   },
 });
 
+// Middleware Express: parsea campo "images" con multer y maneja errores
 export function uploadRoomImagesArray(req, res, next) {
   const handler = multerRoomImages.array('images', MAX_FILES);
+  // Callback cuando multer termina de procesar
   handler(req, res, function onDone(err) {
     if (err) {
       if (err instanceof multer.MulterError) {
@@ -73,6 +77,7 @@ export function uploadRoomImagesArray(req, res, next) {
   });
 }
 
+// Valida buffer imagen: tamaño, contenido real y tipo MIME
 export async function validateImageBuffer(file) {
   if (!file || !Buffer.isBuffer(file.buffer)) {
     throw new BadRequestError('Archivo vacío o inválido');
@@ -103,6 +108,7 @@ export async function validateImageBuffer(file) {
   };
 }
 
+// Valida, genera paths y persiste 1 imagen en disco + BD attrs
 export async function processAndPersistRoomImage(roomId, file, orden, esPrincipal = false) {
   const createdFiles = [];
   try {
@@ -128,6 +134,7 @@ export async function processAndPersistRoomImage(roomId, file, orden, esPrincipa
   }
 }
 
+// Procesa lote imágenes: aplica rollback parcial si falla alguna
 export async function batchProcessRoomImages(roomId, files, startOrden = 0, firstIsMain = false) {
   if (!Array.isArray(files) || files.length === 0) {
     throw new BadRequestError('No se enviaron archivos para procesar');
@@ -153,6 +160,7 @@ export async function batchProcessRoomImages(roomId, files, startOrden = 0, firs
   }
 }
 
+// Objeto exportado middleware Subida Archivos
 export default {
   MAX_BYTES_PER_FILE,
   MAX_FILES,

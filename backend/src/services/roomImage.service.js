@@ -7,7 +7,9 @@ import sequelize from '../config/database.js';
 
 const MAX_IMAGES_PER_ROOM = 20;
 
+// Servicio lógica negocio Imágenes Habitación
 class RoomImageService {
+  // Sube múltiples imágenes, procesa y persiste en BD
   static async uploadImages(habitacionId, files) {
     assertRequired(habitacionId, 'El id de la habitación es requerido');
     const room = await RoomRepository.getById(habitacionId);
@@ -29,6 +31,7 @@ class RoomImageService {
     return created;
   }
 
+  // Reordena imágenes según lista IDs proporcionada
   static async reorder(habitacionId, idsInOrder) {
     assertRequired(habitacionId, 'El id de la habitación es requerido');
     if (!Array.isArray(idsInOrder)) {
@@ -48,6 +51,7 @@ class RoomImageService {
     return await RoomImageRepository.reorder(habitacionId, finalOrder);
   }
 
+  // Establece imagen principal en transacción atómica
   static async setMain(habitacionId, imageId) {
     assertRequired(habitacionId, 'El id de la habitación es requerido');
     assertRequired(imageId, 'El id de la imagen es requerido');
@@ -71,6 +75,7 @@ class RoomImageService {
     }
   }
 
+  // Elimina imagen y archivos físicos asociados
   static async remove(habitacionId, imageId) {
     assertRequired(habitacionId, 'El id de la habitación es requerido');
     assertRequired(imageId, 'El id de la imagen es requerido');
@@ -104,6 +109,7 @@ class RoomImageService {
     return true;
   }
 
+  // Elimina carpeta completa de imágenes habitación
   static async deleteRoomFolderCascade(roomId) {
     deleteRoomFolder(roomId);
   }

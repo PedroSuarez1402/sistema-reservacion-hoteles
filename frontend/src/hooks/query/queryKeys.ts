@@ -8,6 +8,8 @@ export const STALE_TIMES = {
   RESERVATIONS_MINE: 30 * 1000,
   RESERVATION_DETAIL: 1 * 60 * 1000,
   AUTH_ME: 5 * 60 * 1000,
+  TAGS_LIST: 5 * 60 * 1000,
+  TAG_DETAIL: 10 * 60 * 1000,
 } as const;
 
 export const CACHE_TIMES = {
@@ -31,6 +33,11 @@ export const queryKeys = {
   auth: {
     all: ['auth'] as const,
     me: () => [...queryKeys.auth.all, 'me'] as const,
+  },
+  tags: {
+    all: ['tags'] as const,
+    lists: () => [...queryKeys.tags.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.tags.all, 'detail', id] as const,
   },
 } as const;
 

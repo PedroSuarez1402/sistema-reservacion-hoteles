@@ -32,6 +32,7 @@ const sequelize = new Sequelize(
   }
 );
 
+// Prueba conexión autenticación a BD MySQL
 export const testConnection = async () => {
   try {
     await sequelize.authenticate();

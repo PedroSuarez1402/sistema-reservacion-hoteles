@@ -6,7 +6,9 @@ import {
   assertRequired,
 } from '../utils/errors.util.js';
 
+// Servicio lógica negocio Usuarios
 class UserService {
+  // Crea nuevo usuario validando email único
   static async create(data) {
     const { email, password, nombre } = data;
 
@@ -21,10 +23,12 @@ class UserService {
     return await UserRepository.create(data);
   }
 
+  // Obtiene lista todos los usuarios
   static async getAll() {
     return await UserRepository.getAll();
   }
 
+  // Obtiene usuario por ID o lanza error 404
   static async getById(id) {
     assertRequired(id, 'El id del usuario es requerido');
     const user = await UserRepository.getById(id);
@@ -34,6 +38,7 @@ class UserService {
     return user;
   }
 
+  // Obtiene usuario por email o lanza error 404
   static async getByEmail(email) {
     assertRequired(email, 'El email es requerido');
     const user = await UserRepository.getByEmail(email);
@@ -43,6 +48,7 @@ class UserService {
     return user;
   }
 
+  // Actualiza usuario existente validando email único
   static async update(id, data) {
     await this.getById(id);
     if (data.email) {
@@ -54,11 +60,13 @@ class UserService {
     return await UserRepository.update(id, data);
   }
 
+  // Elimina usuario por su ID
   static async delete(id) {
     await this.getById(id);
     return await UserRepository.delete(id);
   }
 
+  // Valida credenciales login y devuelve usuario
   static async loginWithPassword(email, password) {
     assertRequired(email, 'El email es requerido', BadRequestError);
     assertRequired(password, 'La contraseña es requerida', BadRequestError);

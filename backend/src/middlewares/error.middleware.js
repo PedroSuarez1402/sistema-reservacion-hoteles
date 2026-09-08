@@ -1,6 +1,7 @@
 import { ValidationError, UniqueConstraintError } from 'sequelize';
 import { AppError, InternalServerError, NotFoundError } from '../utils/errors.util.js';
 
+// Middleware global: maneja errores y normaliza respuestas HTTP
 const errorHandler = (err, req, res, next) => {
   let error = err;
 

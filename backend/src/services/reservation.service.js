@@ -9,7 +9,9 @@ import {
   assertRequired,
 } from '../utils/errors.util.js';
 
+// Servicio lógica negocio Reservaciones
 class ReservationService {
+    // Crea nueva reservación validando disponibilidad
     static async createReservation(data) {
         const { usuario_id, habitacion_id, fecha_inicio, fecha_fin, estado } = data;
 
@@ -65,10 +67,12 @@ class ReservationService {
         return await ReservationRepository.getById(nuevaReserva.id);
     }
 
+    // Obtiene lista todas las reservaciones con filtros
     static async getAllReservations(filters = {}) {
         return await ReservationRepository.getAll({ where: filters });
     }
 
+    // Obtiene reservación por ID o lanza 404
     static async getReservationById(id) {
         assertRequired(id, 'El id de la reserva es requerido');
         const reserva = await ReservationRepository.getById(id);
@@ -78,16 +82,19 @@ class ReservationService {
         return reserva;
     }
 
+    // Obtiene reservaciones de un usuario por ID
     static async getReservationsByUser(usuario_id) {
         assertRequired(usuario_id, 'El id del usuario es requerido');
         return await ReservationRepository.getByUsuarioId(usuario_id);
     }
 
+    // Obtiene reservaciones de una habitación por ID
     static async getReservationsByRoom(habitacion_id) {
         assertRequired(habitacion_id, 'El id de la habitación es requerido');
         return await ReservationRepository.getByHabitacionId(habitacion_id);
     }
 
+    // Cancela reservación validando permisos y estado
     static async cancelReservation(reserva_id, usuarioQueSolicita) {
         assertRequired(reserva_id, 'El id de la reserva es requerido');
         assertRequired(usuarioQueSolicita, 'El usuario solicitante es requerido');
@@ -116,6 +123,7 @@ class ReservationService {
         return await ReservationRepository.updateStatus(reserva_id, 'CANCELADA');
     }
 
+    // Actualiza reservación validando disponibilidad y permisos
     static async updateReservation(id, usuarioQueSolicita, data) {
         assertRequired(id, 'El id de la reserva es requerido');
         assertRequired(usuarioQueSolicita, 'El usuario solicitante es requerido');
@@ -186,6 +194,7 @@ class ReservationService {
         return await ReservationRepository.getById(id);
     }
 
+    // Elimina reservación validando permisos de usuario
     static async deleteReservation(id, usuarioQueSolicita, esAdminFlag = null) {
         assertRequired(id, 'El id de la reserva es requerido');
 

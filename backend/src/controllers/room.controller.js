@@ -2,6 +2,7 @@ import RoomService from '../services/room.service.js';
 import { BadRequestError } from '../utils/errors.util.js';
 import RoomImageController from './roomImage.controller.js';
 
+// Serializa habitación a objeto plano con imágenes
 function serializeRoom(room) {
   if (!room) return null;
   const plain = typeof room.toJSON === 'function' ? room.toJSON() : { ...room };
@@ -11,7 +12,9 @@ function serializeRoom(room) {
   return plain;
 }
 
+// Controlador peticiones HTTP Habitaciones
 class RoomController {
+  // Obtiene lista todas las habitaciones
   static async getAll(req, res, next) {
     try {
       const rooms = await RoomService.getAll();
@@ -25,6 +28,7 @@ class RoomController {
     }
   }
 
+  // Obtiene habitaciones disponibles en rango fechas
   static async getAvailable(req, res, next) {
     try {
       const { fecha_inicio, fecha_fin } = req.query;
@@ -42,6 +46,7 @@ class RoomController {
     }
   }
 
+  // Obtiene una habitación por su ID
   static async getById(req, res, next) {
     try {
       const { id } = req.params;
@@ -56,6 +61,7 @@ class RoomController {
     }
   }
 
+  // Crea una nueva habitación
   static async create(req, res, next) {
     try {
       const room = await RoomService.create(req.body);
@@ -69,6 +75,7 @@ class RoomController {
     }
   }
 
+  // Actualiza datos de una habitación existente
   static async update(req, res, next) {
     try {
       const { id } = req.params;
@@ -83,6 +90,7 @@ class RoomController {
     }
   }
 
+  // Elimina una habitación por su ID
   static async remove(req, res, next) {
     try {
       const { id } = req.params;

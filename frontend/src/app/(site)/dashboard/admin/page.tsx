@@ -6,7 +6,10 @@ import {
   CalendarCheck,
   CalendarPlus2,
   Hotel,
+  Pencil,
   Plus,
+  Search as SearchIcon,
+  Tag as TagIcon,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -19,26 +22,41 @@ import {
   CardHeader,
   CardTitle,
   Dialog,
+  Input,
   ReservationTable,
   RoomCard,
   RoomModal,
+  TagModal,
   useToast,
 } from '@/components';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import {
   useAllReservations,
   useCancelReservation,
   useCreateRoom,
+  useCreateTag,
   useDeleteReservation,
   useDeleteRoom,
+  useDeleteTag,
   useRooms,
+  useTags,
   useUpdateReservationStatus,
   useUpdateRoom,
+  useUpdateTag,
 } from '@/hooks';
-import { formatCurrency } from '@/lib/utils';
-import type { ApiErrorResponse, CreateRoomPayload, Reservation, ReservationStatus, Room, UpdateRoomPayload } from '@/types';
+import type {
+  ApiErrorResponse,
+  CreateRoomPayload,
+  CreateTagPayload,
+  Reservation,
+  ReservationStatus,
+  Room,
+  Tag,
+  UpdateRoomPayload,
+  UpdateTagPayload,
+} from '@/types';
 
-type AdminTab = 'reservaciones' | 'habitaciones';
+type AdminTab = 'reservaciones' | 'habitaciones' | 'etiquetas';
 
 function ReservationSummary({
   reservations,
@@ -164,11 +182,74 @@ function RoomSummary({ rooms }: { rooms: Room[] }) {
   );
 }
 
+function TagSummary({ tags, rooms }: { tags: Tag[]; rooms: Room[] }) {
+  const totalTags = tags.length;
+  const taggedRooms = rooms.filter(
+    (r) => Array.isArray(r.etiquetas) && r.etiquetas.length > 0
+  ).length;
+  const avgTagsPerRoom =
+    rooms.length > 0
+      ? rooms.reduce((acc, r) => acc + ((r.etiquetas?.length) ?? 0), 0) / rooms.length
+      : 0;
+  const unusedTags = tags.filter((t) => {
+    return !rooms.some((r) => (r.etiquetas ?? []).some((rt) => rt.id === t.id));
+  }).length;
+
+  const cards = [
+    {
+      label: 'Etiquetas en catálogo',
+      value: totalTags.toString(),
+      icon: <TagIcon className="h-5 w-5 text-primary-600" />,
+      tone: 'bg-primary-50 ring-primary-100',
+    },
+    {
+      label: 'Habitaciones etiquetadas',
+      value: `${taggedRooms} / ${rooms.length}`,
+      icon: <Hotel className="h-5 w-5 text-emerald-600" />,
+      tone: 'bg-emerald-50 ring-emerald-100',
+    },
+    {
+      label: 'Promedio / habitación',
+      value: avgTagsPerRoom.toFixed(1),
+      icon: <span className="text-lg">📋</span>,
+      tone: 'bg-sky-50 ring-sky-100',
+    },
+    {
+      label: 'Sin usar',
+      value: unusedTags.toString(),
+      icon: <SearchIcon className="h-5 w-5 text-amber-600" />,
+      tone: 'bg-amber-50 ring-amber-100',
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {cards.map((card) => (
+        <div
+          key={card.label}
+          className={`rounded-2xl p-4 ring-1 ${card.tone}`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                {card.label}
+              </p>
+              <p className="text-2xl font-bold text-slate-900">{card.value}</p>
+            </div>
+            <div className="rounded-xl bg-white/80 p-2 shadow-sm ring-1 ring-white">
+              {card.icon}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AdminPage() {
   const toast = useToast();
   const [activeTab, setActiveTab] = React.useState<AdminTab>('reservaciones');
 
-  // ----- Reservas
   const reservationsQuery = useAllReservations();
   const cancelMutation = useCancelReservation();
   const statusMutation = useUpdateReservationStatus();
@@ -177,7 +258,6 @@ function AdminPage() {
   const [confirmCancel, setConfirmCancel] = React.useState<Reservation | null>(null);
   const [confirmDeleteReservation, setConfirmDeleteReservation] = React.useState<Reservation | null>(null);
 
-  // ----- Habitaciones
   const roomsQuery = useRooms();
   const createRoomMutation = useCreateRoom();
   const updateRoomMutation = useUpdateRoom();
@@ -186,6 +266,16 @@ function AdminPage() {
   const [roomModalOpen, setRoomModalOpen] = React.useState(false);
   const [roomEditing, setRoomEditing] = React.useState<Room | null>(null);
   const [confirmDeleteRoom, setConfirmDeleteRoom] = React.useState<Room | null>(null);
+
+  const tagsQuery = useTags();
+  const createTagMutation = useCreateTag();
+  const updateTagMutation = useUpdateTag();
+  const deleteTagMutation = useDeleteTag();
+
+  const [tagModalOpen, setTagModalOpen] = React.useState(false);
+  const [tagEditing, setTagEditing] = React.useState<Tag | null>(null);
+  const [confirmDeleteTag, setConfirmDeleteTag] = React.useState<Tag | null>(null);
+  const [tagSearch, setTagSearch] = React.useState('');
 
   React.useEffect(() => {
     if (reservationsQuery.isError) {
@@ -202,12 +292,21 @@ function AdminPage() {
         'No se pudo cargar el inventario de habitaciones';
       toast.error('Error al cargar habitaciones', msg);
     }
+    if (tagsQuery.isError) {
+      const err = tagsQuery.error as unknown as ApiErrorResponse | Error | null;
+      const msg =
+        (err && 'message' in err ? err.message : undefined) ||
+        'No se pudo cargar el catálogo de etiquetas';
+      toast.error('Error al cargar etiquetas', msg);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     reservationsQuery.isError,
     reservationsQuery.error,
     roomsQuery.isError,
     roomsQuery.error,
+    tagsQuery.isError,
+    tagsQuery.error,
   ]);
 
   async function handleStatusChange(id: string, estado: ReservationStatus) {
@@ -284,6 +383,65 @@ function AdminPage() {
     }
   }
 
+  function openCreateTag() {
+    setTagEditing(null);
+    setTagModalOpen(true);
+  }
+
+  function openEditTag(tag: Tag) {
+    setTagEditing(tag);
+    setTagModalOpen(true);
+  }
+
+  async function handleTagSubmit(
+    payload: (CreateTagPayload & { id?: string }) | (UpdateTagPayload & { id?: string })
+  ) {
+    try {
+      if (payload.id) {
+        const { id, ...rest } = payload;
+        await updateTagMutation.mutateAsync({
+          id,
+          payload: rest as UpdateTagPayload,
+        });
+        toast.success('Etiqueta actualizada', `Se actualizó "${payload.nombre ?? '(sin nombre)'}"`);
+      } else {
+        await createTagMutation.mutateAsync(payload as CreateTagPayload);
+        toast.success('Etiqueta creada', `Se agregó "${payload.nombre}" al catálogo`);
+      }
+      setTagModalOpen(false);
+      setTagEditing(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'No se pudo guardar la etiqueta';
+      toast.error('Error al guardar etiqueta', message);
+    }
+  }
+
+  async function confirmDeleteTagHandler() {
+    if (!confirmDeleteTag) return;
+    try {
+      await deleteTagMutation.mutateAsync(confirmDeleteTag.id);
+      toast.success(
+        'Etiqueta eliminada',
+        `"${confirmDeleteTag.nombre}" fue removida del catálogo`
+      );
+      setConfirmDeleteTag(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'No se pudo eliminar la etiqueta';
+      toast.error('Error al eliminar etiqueta', message);
+    }
+  }
+
+  const filteredTags = React.useMemo(() => {
+    const base = tagsQuery.data ?? [];
+    const kw = tagSearch.trim().toLowerCase();
+    if (!kw) return base;
+    return base.filter(
+      (t) =>
+        t.nombre.toLowerCase().includes(kw) ||
+        (t.descripcion ?? '').toLowerCase().includes(kw)
+    );
+  }, [tagsQuery.data, tagSearch]);
+
   const tabs: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
     {
       key: 'reservaciones',
@@ -294,6 +452,11 @@ function AdminPage() {
       key: 'habitaciones',
       label: 'Habitaciones',
       icon: <Hotel className="h-4 w-4" />,
+    },
+    {
+      key: 'etiquetas',
+      label: 'Etiquetas',
+      icon: <TagIcon className="h-4 w-4" />,
     },
   ];
 
@@ -308,12 +471,16 @@ function AdminPage() {
                 Administración del Hotel
               </CardTitle>
               <CardDescription>
-                Gestiona reservaciones e inventario de habitaciones.
+                Gestiona reservaciones, inventario de habitaciones y catálogo de etiquetas.
               </CardDescription>
             </div>
             {activeTab === 'habitaciones' ? (
               <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreateRoom}>
                 Agregar habitación
+              </Button>
+            ) : activeTab === 'etiquetas' ? (
+              <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreateTag}>
+                Nueva etiqueta
               </Button>
             ) : null}
           </div>
@@ -376,7 +543,7 @@ function AdminPage() {
             </Card>
           ) : null}
         </>
-      ) : (
+      ) : activeTab === 'habitaciones' ? (
         <>
           <RoomSummary rooms={roomsQuery.data ?? []} />
           <section>
@@ -385,7 +552,7 @@ function AdminPage() {
                 Inventario de habitaciones
               </h3>
               <p className="text-sm text-slate-500">
-                Administra el inventario. Edita precios, tipos y estados.
+                Administra el inventario. Edita precios, tipos, estados, descripciones y etiquetas.
               </p>
             </div>
             {roomsQuery.isLoading ? (
@@ -432,6 +599,140 @@ function AdminPage() {
             )}
           </section>
         </>
+      ) : (
+        <>
+          <TagSummary tags={tagsQuery.data ?? []} rooms={roomsQuery.data ?? []} />
+          <section>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Catálogo de etiquetas
+                </h3>
+                <p className="text-sm text-slate-500">
+                  Crea y administra las características disponibles para asignar a las habitaciones.
+                </p>
+              </div>
+              <div className="w-full sm:max-w-xs">
+                <Input
+                  placeholder="Buscar etiqueta..."
+                  leftIcon={<SearchIcon className="h-4 w-4" />}
+                  value={tagSearch}
+                  onChange={(e) => setTagSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            {tagsQuery.isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-14 animate-pulse rounded-xl border border-slate-200 bg-white"
+                  />
+                ))}
+              </div>
+            ) : tagsQuery.isError ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                    <div className="space-y-1">
+                      <p className="font-semibold text-rose-700">
+                        Error al cargar etiquetas
+                      </p>
+                      <p className="text-sm text-rose-600">
+                        {(() => {
+                          const e = tagsQuery.error as unknown as ApiErrorResponse | Error | null;
+                          return e && 'message' in e ? e.message : 'Inténtalo de nuevo en unos momentos.';
+                        })()}
+                      </p>
+                    </div>
+                    <Button onClick={() => tagsQuery.refetch()}>Reintentar</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : filteredTags.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 ring-1 ring-primary-100">
+                    <TagIcon className="h-6 w-6 text-primary-600" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-semibold text-slate-800">
+                      {tagSearch.trim()
+                        ? 'No hay etiquetas que coincidan con tu búsqueda'
+                        : 'Aún no hay etiquetas en el catálogo'}
+                    </p>
+                    <p className="max-w-sm text-sm text-slate-500">
+                      {tagSearch.trim()
+                        ? 'Intenta con otros términos o limpia el buscador.'
+                        : 'Crea la primera etiqueta para empezar a describir las características de tus habitaciones.'}
+                    </p>
+                  </div>
+                  {!tagSearch.trim() ? (
+                    <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreateTag}>
+                      Crear primera etiqueta
+                    </Button>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="divide-y divide-slate-100 p-0">
+                  {filteredTags.map((tag) => {
+                    const usageCount = (roomsQuery.data ?? []).filter((r) =>
+                      (r.etiquetas ?? []).some((rt) => rt.id === tag.id)
+                    ).length;
+                    return (
+                      <div
+                        key={tag.id}
+                        className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="flex min-w-0 items-start gap-3">
+                          <Badge variant="default" className="shrink-0">
+                            <TagIcon className="mr-1 h-3 w-3" aria-hidden="true" />
+                            {tag.nombre}
+                          </Badge>
+                          <div className="min-w-0 space-y-0.5">
+                            {tag.descripcion ? (
+                              <p className="text-sm text-slate-600 line-clamp-2">
+                                {tag.descripcion}
+                              </p>
+                            ) : (
+                              <p className="text-xs italic text-slate-400">
+                                Sin descripción administrativa
+                              </p>
+                            )}
+                            <p className="text-xs text-slate-500">
+                              Asignada a <span className="font-medium text-slate-700">{usageCount}</span>{' '}
+                              habitacione{usageCount === 1 ? '' : 's'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-2 sm:justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            leftIcon={<Pencil className="h-4 w-4" />}
+                            onClick={() => openEditTag(tag)}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            leftIcon={<Trash2 className="h-4 w-4" />}
+                            onClick={() => setConfirmDeleteTag(tag)}
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+          </section>
+        </>
       )}
 
       <RoomModal
@@ -446,7 +747,17 @@ function AdminPage() {
         allowStatusEdit={true}
       />
 
-      {/* Cancel reservation dialog */}
+      <TagModal
+        open={tagModalOpen}
+        onClose={() => {
+          setTagModalOpen(false);
+          setTagEditing(null);
+        }}
+        initialValue={tagEditing}
+        onSubmit={handleTagSubmit}
+        isLoading={createTagMutation.isPending || updateTagMutation.isPending}
+      />
+
       <Dialog
         open={!!confirmCancel}
         onClose={() => setConfirmCancel(null)}
@@ -488,7 +799,6 @@ function AdminPage() {
         ) : null}
       </Dialog>
 
-      {/* Delete reservation dialog */}
       <Dialog
         open={!!confirmDeleteReservation}
         onClose={() => setConfirmDeleteReservation(null)}
@@ -526,7 +836,6 @@ function AdminPage() {
         ) : null}
       </Dialog>
 
-      {/* Delete room dialog */}
       <Dialog
         open={!!confirmDeleteRoom}
         onClose={() => setConfirmDeleteRoom(null)}
@@ -565,6 +874,44 @@ function AdminPage() {
             <p className="mt-1 text-rose-700">
               Precio por noche: {formatCurrency(Number(confirmDeleteRoom.precio_noche))}
             </p>
+          </div>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={!!confirmDeleteTag}
+        onClose={() => setConfirmDeleteTag(null)}
+        title="Eliminar etiqueta"
+        description="La etiqueta será removida del catálogo y desasignada automáticamente de todas las habitaciones que la utilicen."
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDeleteTag(null)}
+              disabled={deleteTagMutation.isPending}
+            >
+              Volver
+            </Button>
+            <Button
+              variant="destructive"
+              loading={deleteTagMutation.isPending}
+              leftIcon={<Trash2 className="h-4 w-4" />}
+              onClick={confirmDeleteTagHandler}
+            >
+              Eliminar etiqueta
+            </Button>
+          </>
+        }
+      >
+        {confirmDeleteTag ? (
+          <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4 text-sm text-rose-800">
+            <div className="flex items-center gap-2">
+              <Badge variant="danger">{confirmDeleteTag.nombre}</Badge>
+              <span className="text-xs text-rose-600">#{confirmDeleteTag.id.slice(0, 8)}</span>
+            </div>
+            {confirmDeleteTag.descripcion ? (
+              <p className="mt-2 text-rose-700">{confirmDeleteTag.descripcion}</p>
+            ) : null}
           </div>
         ) : null}
       </Dialog>

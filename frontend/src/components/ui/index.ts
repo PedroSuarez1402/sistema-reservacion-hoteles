@@ -1,5 +1,6 @@
 export { Button, buttonVariants } from './Button';
 export { Input } from './Input';
+export { Textarea } from './Textarea';
 export { Select } from './Select';
 export type { SelectOption } from './Select';
 export { Badge } from './Badge';

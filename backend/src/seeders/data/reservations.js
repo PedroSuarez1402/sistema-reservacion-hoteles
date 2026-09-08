@@ -1,3 +1,4 @@
+// Calcula fecha ISO con offset días desde hoy
 function getDate(offsetDays, hour = 12) {
   const date = new Date();
   date.setHours(0, 0, 0, 0);
