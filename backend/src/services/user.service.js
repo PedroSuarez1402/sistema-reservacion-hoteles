@@ -28,6 +28,52 @@ class UserService {
     return await UserRepository.getAll();
   }
 
+  // Obtiene lista paginada de usuarios con contadores de resumen (batch)
+  static async getAllPaginated({ keyword, page, limit, rol }) {
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 8;
+
+    const result = await UserRepository.findAndCountAllPaginated({
+      keyword,
+      page: pageNum,
+      limit: limitNum,
+      rol,
+    });
+
+    const { rows, count } = result;
+    const perPage = limitNum;
+    const totalPages = Math.ceil(count / perPage);
+    const ids = rows.map((r) => r.id);
+
+    let summaryMap = new Map();
+    if (ids.length > 0) {
+      summaryMap = await UserRepository.getSummaryMapForUserIds(ids);
+    }
+
+    const items = rows.map((user) => {
+      const plain = user.get({ plain: true });
+      const counters = summaryMap.get(user.id) || {
+        reservaciones_count: 0,
+        ingreso_total: null,
+        ultima_reserva_fecha: null,
+        ultima_reserva_estado: null,
+      };
+      return { ...plain, ...counters };
+    });
+
+    return {
+      items,
+      meta: {
+        total: count,
+        page: pageNum,
+        perPage,
+        totalPages,
+        hasNextPage: pageNum < totalPages,
+        hasPrevPage: pageNum > 1,
+      },
+    };
+  }
+
   // Obtiene usuario por ID o lanza error 404
   static async getById(id) {
     assertRequired(id, 'El id del usuario es requerido');
@@ -36,6 +82,14 @@ class UserService {
       throw new NotFoundError('Usuario no encontrado');
     }
     return user;
+  }
+
+  // Obtiene usuario + resumen (reservaciones_count, ingreso, ultima reserva)
+  static async getByIdWithSummary(id) {
+    const user = await this.getById(id);
+    const plain = user.get({ plain: true });
+    const summary = await UserRepository.getSummaryForUserId(id);
+    return { ...plain, ...summary };
   }
 
   // Obtiene usuario por email o lanza error 404

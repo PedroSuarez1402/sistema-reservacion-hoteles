@@ -102,7 +102,25 @@ export const roomTypeLabels: Record<string, string> = {
 export const roleLabels: Record<string, string> = {
   HUESPED: 'Huésped',
   ADMIN: 'Administrador',
-  RECEPCIÓN: 'Recepción',
+  RECEPCION: 'Recepción',
+};
+
+export const roleStyles: Record<
+  string,
+  { label: string; className: string }
+> = {
+  HUESPED: {
+    label: 'Huésped',
+    className: 'bg-sky-100 text-sky-800 border border-sky-200',
+  },
+  ADMIN: {
+    label: 'Administrador',
+    className: 'bg-purple-100 text-purple-800 border border-purple-200',
+  },
+  RECEPCION: {
+    label: 'Recepción',
+    className: 'bg-amber-100 text-amber-800 border border-amber-200',
+  },
 };
 
 const imagen = (prompt: string, size: 'landscape_16_9' | 'portrait_4_3' | 'square_hd' = 'landscape_16_9') =>

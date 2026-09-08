@@ -1,6 +1,5 @@
 import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database.js';
-import Room from './Room.js';
 
 // Modelo Sequelize Reservación
 class Reservation extends Model {}
@@ -72,6 +71,7 @@ Reservation.init(
     hooks: {
       // Hook: calcula precio_total según noches y precio habitación
       beforeCreate: async (reservation) => {
+        const { default: Room } = await import('./Room.js');
         const room = await Room.findByPk(reservation.habitacion_id);
         if (!room) {
           throw new Error('La habitación no existe');

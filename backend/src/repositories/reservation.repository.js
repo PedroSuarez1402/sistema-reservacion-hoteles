@@ -3,6 +3,9 @@ import Reservation from '../models/Reservation.js';
 import User from '../models/User.js';
 import Room from '../models/Room.js';
 
+const USER_INCLUDE_ATTRS = ['id', 'nombre', 'email', 'rol'];
+const ROOM_INCLUDE_ATTRS = ['id', 'numero', 'tipo', 'precio_noche', 'estado'];
+
 // Repositorio acceso datos Reservaciones
 class ReservationRepository {
   // Crea nueva reservación en BD
@@ -25,15 +28,15 @@ class ReservationRepository {
     if (includeUser) {
       include.push({
         model: User,
-        as: undefined,
-        attributes: ['id', 'nombre', 'email', 'rol'],
+        as: 'usuario',
+        attributes: USER_INCLUDE_ATTRS,
       });
     }
     if (includeRoom) {
       include.push({
         model: Room,
-        as: undefined,
-        attributes: ['id', 'numero', 'tipo', 'precio_noche', 'estado'],
+        as: 'habitacion',
+        attributes: ROOM_INCLUDE_ATTRS,
       });
     }
 
@@ -47,13 +50,15 @@ class ReservationRepository {
     if (includeUser) {
       include.push({
         model: User,
-        attributes: ['id', 'nombre', 'email', 'rol'],
+        as: 'usuario',
+        attributes: USER_INCLUDE_ATTRS,
       });
     }
     if (includeRoom) {
       include.push({
         model: Room,
-        attributes: ['id', 'numero', 'tipo', 'precio_noche', 'estado'],
+        as: 'habitacion',
+        attributes: ROOM_INCLUDE_ATTRS,
       });
     }
     return await Reservation.findByPk(id, { include });
@@ -71,7 +76,8 @@ class ReservationRepository {
     if (includeRoom) {
       include.push({
         model: Room,
-        attributes: ['id', 'numero', 'tipo', 'precio_noche', 'estado'],
+        as: 'habitacion',
+        attributes: ROOM_INCLUDE_ATTRS,
       });
     }
     return await Reservation.findAll({
@@ -88,7 +94,8 @@ class ReservationRepository {
     if (includeUser) {
       include.push({
         model: User,
-        attributes: ['id', 'nombre', 'email', 'rol'],
+        as: 'usuario',
+        attributes: USER_INCLUDE_ATTRS,
       });
     }
     return await Reservation.findAll({
@@ -189,10 +196,10 @@ class ReservationRepository {
 
     const include = [];
     if (includeUser) {
-      include.push({ model: User, attributes: ['id', 'nombre', 'email', 'rol'] });
+      include.push({ model: User, as: 'usuario', attributes: USER_INCLUDE_ATTRS });
     }
     if (includeRoom) {
-      include.push({ model: Room, attributes: ['id', 'numero', 'tipo', 'precio_noche', 'estado'] });
+      include.push({ model: Room, as: 'habitacion', attributes: ROOM_INCLUDE_ATTRS });
     }
 
     return await Reservation.findAll({ where, include, order });

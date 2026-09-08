@@ -174,5 +174,24 @@ export interface UpdateTagPayload {
   descripcion?: string | null;
 }
 
+export interface ClientListItem {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: UserRole;
+  createdAt?: string;
+  updatedAt?: string;
+  reservaciones_count: number;
+  ingreso_total: number | null;
+  ultima_reserva_fecha: string | null;
+  ultima_reserva_estado: ReservationStatus | null;
+}
+
+export interface UpdateUserPayload {
+  nombre?: string;
+  email?: string;
+  rol?: UserRole;
+}
+
 export type UploadImageProgressCb = (file: File, percent: number) => void;
 

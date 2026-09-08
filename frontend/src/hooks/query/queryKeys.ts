@@ -1,4 +1,4 @@
-import type { RoomAvailabilityParams } from '../../types';
+import type { RoomAvailabilityParams, UserRole } from '../../types';
 
 export const STALE_TIMES = {
   ROOMS_LIST: 2 * 60 * 1000,
@@ -10,6 +10,8 @@ export const STALE_TIMES = {
   AUTH_ME: 5 * 60 * 1000,
   TAGS_LIST: 5 * 60 * 1000,
   TAG_DETAIL: 10 * 60 * 1000,
+  USERS_LIST: 2 * 60 * 1000,
+  USER_DETAIL: 5 * 60 * 1000,
 } as const;
 
 export const CACHE_TIMES = {
@@ -39,6 +41,13 @@ export const queryKeys = {
     lists: (params?: { keyword?: string; page?: number; limit?: number }) =>
       [...queryKeys.tags.all, 'list', params ?? {}] as const,
     detail: (id: string) => [...queryKeys.tags.all, 'detail', id] as const,
+  },
+  users: {
+    all: ['users'] as const,
+    lists: (params?: { keyword?: string; page?: number; limit?: number; rol?: UserRole }) =>
+      [...queryKeys.users.all, 'list', params ?? {}] as const,
+    detail: (id: string) => [...queryKeys.users.all, 'detail', id] as const,
+    summary: (id: string) => [...queryKeys.users.all, 'summary', id] as const,
   },
 } as const;
 

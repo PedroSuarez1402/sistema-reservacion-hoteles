@@ -1,5 +1,13 @@
 import ReservationService from '../services/reservation.service.js';
-import { ForbiddenError } from '../utils/errors.util.js';
+import { ForbiddenError, InternalServerError } from '../utils/errors.util.js';
+
+function logControllerError(context, error, req) {
+  const now = new Date().toISOString();
+  console.error(`[${now}] [CONTROLLER ERROR][${context}] method=${req?.method} url=${req?.originalUrl} user=${req?.user?.id ?? '(anon)'} rol=${req?.user?.rol ?? '—'}`);
+  console.error(`  message: ${error?.message ?? '(no message)'}`);
+  if (error?.name) console.error(`  errorName: ${error.name}`);
+  if (error?.stack) console.error(`  stack: ${error.stack.split('\n')[0]}${error.stack.split('\n')[1] ? '\n' + error.stack.split('\n')[1] : ''}`);
+}
 
 // Controlador peticiones HTTP Reservaciones
 class ReservationController {
@@ -13,6 +21,10 @@ class ReservationController {
         data: reservas,
       });
     } catch (error) {
+      logControllerError('Reservation.getAll', error, req);
+      if (error?.name && error.name.includes('EagerLoadingError')) {
+        return next(new InternalServerError('Error al cargar reservaciones: asociaciones de base de datos inválidas'));
+      }
       next(error);
     }
   }
@@ -28,6 +40,10 @@ class ReservationController {
         data: reservas,
       });
     } catch (error) {
+      logControllerError('Reservation.getMyReservations', error, req);
+      if (error?.name && error.name.includes('EagerLoadingError')) {
+        return next(new InternalServerError('Error al cargar tus reservaciones'));
+      }
       next(error);
     }
   }
@@ -37,10 +53,13 @@ class ReservationController {
     try {
       const { id } = req.params;
       const reserva = await ReservationService.getReservationById(id);
-
+      if (!reserva) {
+        return next(new InternalServerError('Reserva no encontrada'));
+      }
       const esStaff =
         req.user.rol === 'ADMIN' || req.user.rol === 'RECEPCION';
-      if (!esStaff && reserva.usuario_id !== req.user.id) {
+      const reservaUsuarioId = reserva.usuario_id ?? (reserva.usuario && reserva.usuario.id);
+      if (!esStaff && reservaUsuarioId !== req.user.id) {
         throw new ForbiddenError('No tienes permiso para ver esta reserva');
       }
 
@@ -50,6 +69,10 @@ class ReservationController {
         data: reserva,
       });
     } catch (error) {
+      logControllerError('Reservation.getById', error, req);
+      if (error?.name && error.name.includes('EagerLoadingError')) {
+        return next(new InternalServerError('Error al cargar el detalle de la reservación'));
+      }
       next(error);
     }
   }
@@ -74,6 +97,7 @@ class ReservationController {
         data: nuevaReserva,
       });
     } catch (error) {
+      logControllerError('Reservation.create', error, req);
       next(error);
     }
   }
@@ -96,6 +120,7 @@ class ReservationController {
         data: actualizada,
       });
     } catch (error) {
+      logControllerError('Reservation.update', error, req);
       next(error);
     }
   }
@@ -111,6 +136,7 @@ class ReservationController {
         message: 'Reserva cancelada correctamente',
       });
     } catch (error) {
+      logControllerError('Reservation.cancel', error, req);
       next(error);
     }
   }
@@ -126,6 +152,7 @@ class ReservationController {
         message: 'Reserva eliminada correctamente',
       });
     } catch (error) {
+      logControllerError('Reservation.remove', error, req);
       next(error);
     }
   }

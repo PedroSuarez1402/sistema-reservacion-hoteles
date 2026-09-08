@@ -62,3 +62,14 @@ export type {
   UseUpdateTagOptions,
   UseDeleteTagOptions,
 } from './useTags';
+export {
+  useUsersPaginated,
+  useUserSummary,
+  useUpdateUser,
+  useDeleteUser,
+} from './query/useUsers';
+export type {
+  UseUsersPaginatedOptions,
+  UseUpdateUserOptions,
+  UseDeleteUserOptions,
+} from './query/useUsers';

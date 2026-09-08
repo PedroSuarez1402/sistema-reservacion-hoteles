@@ -1,6 +1,5 @@
 import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database.js';
-import Reservation from './Reservation.js';
 
 // Modelo Sequelize Habitación
 class Room extends Model {}
@@ -53,15 +52,5 @@ Room.init(
     },
   }
 );
-
-Room.hasMany(Reservation, {
-  foreignKey: 'habitacion_id',
-  as: 'reservaciones',
-});
-
-Reservation.belongsTo(Room, {
-  foreignKey: 'habitacion_id',
-  as: 'habitacion',
-});
 
 export default Room;
