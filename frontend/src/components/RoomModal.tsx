@@ -94,7 +94,7 @@ function RoomModal({
   }, [open, initialValue, setValue, reset]);
 
   const modo = initialValue ? 'edit' : 'create';
-  const dialogSize: 'md' | 'lg' | 'xl' = initialValue ? 'xl' : 'md';
+  const dialogSize: 'md' | 'lg' | 'xl' = initialValue ? 'lg' : 'md';
   const images: RoomImage[] | undefined = initialValue?.imagenes as RoomImage[] | undefined;
 
   async function handleValidSubmit(values: RoomFormValues) {
