@@ -34,6 +34,16 @@ Room.init(
     sequelize,
     modelName: 'Room',
     tableName: 'habitaciones',
+    hooks: {
+      async afterDestroy(instance) {
+        try {
+          const { deleteRoomFolder } = await import('../services/storage.service.js');
+          if (instance?.id) deleteRoomFolder(instance.id);
+        } catch {
+          // ignore
+        }
+      },
+    },
   }
 );
 

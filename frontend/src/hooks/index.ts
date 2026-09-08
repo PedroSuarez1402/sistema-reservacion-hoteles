@@ -6,6 +6,10 @@ export {
   useCreateRoom,
   useUpdateRoom,
   useDeleteRoom,
+  useUploadRoomImages,
+  useReorderRoomImages,
+  useSetMainRoomImage,
+  useDeleteRoomImage,
 } from './useRooms';
 export type {
   UseRoomsOptions,
@@ -14,6 +18,10 @@ export type {
   UseCreateRoomOptions,
   UseUpdateRoomOptions,
   UseDeleteRoomOptions,
+  UseUploadRoomImagesOptions,
+  UseReorderRoomImagesOptions,
+  UseSetMainRoomImageOptions,
+  UseDeleteRoomImageOptions,
 } from './useRooms';
 export {
   useAllReservations,

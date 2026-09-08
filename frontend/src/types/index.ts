@@ -19,12 +19,33 @@ export interface User {
   updatedAt?: string;
 }
 
+export interface RoomImage {
+  id: string;
+  habitacion_id: string;
+  ruta_original: string;
+  ruta_web: string;
+  ruta_miniatura: string;
+  nombre_original: string;
+  tamano_original_bytes: number;
+  tipo_mime: string;
+  es_principal: boolean;
+  orden: number;
+  url_original: string;
+  url_web: string;
+  url_miniatura: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Room {
   id: string;
   numero: string;
   tipo: RoomType;
   precio_noche: number;
   estado: RoomStatus;
+  imagenes?: RoomImage[];
+  descripcion?: string;
+  amenidades?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -112,3 +133,6 @@ export interface CreateRoomPayload {
 export interface UpdateReservationStatusPayload {
   estado: ReservationStatus;
 }
+
+export type UploadImageProgressCb = (file: File, percent: number) => void;
+

@@ -6,8 +6,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button, Dialog, Input, Select } from './ui';
+import { Badge } from './ui/Badge';
 import type { SelectOption } from './ui/Select';
-import type { CreateRoomPayload, Room, UpdateRoomPayload } from '../types';
+import type { CreateRoomPayload, Room, RoomImage, UpdateRoomPayload } from '../types';
+import { RoomImageUploader } from './RoomImageUploader';
+import { RoomImageGrid } from './RoomImageGrid';
+import { cn } from '../lib/utils';
+import { Lightbulb } from 'lucide-react';
 
 const roomTypeOptions: SelectOption[] = [
   { value: 'SENCILLA', label: 'Sencilla' },
@@ -61,15 +66,15 @@ function RoomModal({
     formState: { errors },
     watch,
   } = useForm<RoomFormValues>({
-    resolver: zodResolver(createRoomSchema),
-    defaultValues: {
-      numero: '',
-      tipo: 'SENCILLA',
-      precio_noche: undefined as unknown as number,
-      estado: 'ACTIVA',
-    },
-    mode: 'onTouched',
-  });
+      resolver: zodResolver(createRoomSchema),
+      defaultValues: {
+        numero: '',
+        tipo: 'SENCILLA',
+        precio_noche: undefined as unknown as number,
+        estado: 'ACTIVA',
+      },
+      mode: 'onTouched',
+    });
 
   useEffect(() => {
     if (!open) return;
@@ -89,6 +94,8 @@ function RoomModal({
   }, [open, initialValue, setValue, reset]);
 
   const modo = initialValue ? 'edit' : 'create';
+  const dialogSize: 'md' | 'lg' | 'xl' = initialValue ? 'xl' : 'md';
+  const images: RoomImage[] | undefined = initialValue?.imagenes as RoomImage[] | undefined;
 
   async function handleValidSubmit(values: RoomFormValues) {
     const payload: CreateRoomPayload & { id?: string } = {
@@ -111,8 +118,9 @@ function RoomModal({
       description={
         modo === 'create'
           ? 'Ingresa los datos para registrar una nueva habitación en el inventario.'
-          : 'Actualiza los datos de la habitación seleccionada.'
+          : 'Actualiza los datos y la galería de imágenes de la habitación seleccionada.'
       }
+      size={dialogSize}
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={isLoading}>
@@ -128,46 +136,87 @@ function RoomModal({
         </>
       }
     >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void handleSubmit(handleValidSubmit)(e);
-        }}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-      >
-        <Input
-          label="Número"
-          placeholder="Ej. 101"
-          error={errors.numero?.message}
-          {...register('numero')}
-        />
-        <Select
-          label="Tipo"
-          placeholder="Selecciona un tipo"
-          options={roomTypeOptions}
-          value={watch('tipo')}
-          onChange={(e) => setValue('tipo', e.target.value as RoomFormValues['tipo'], { shouldValidate: true })}
-          error={errors.tipo?.message}
-        />
-        <Input
-          type="number"
-          step="0.01"
-          min="0"
-          label="Precio por noche"
-          placeholder="Ej. 1500"
-          error={errors.precio_noche?.message}
-          {...register('precio_noche')}
-        />
-        {allowStatusEdit ? (
-          <Select
-            label="Estado"
-            options={roomStatusOptions}
-            value={watch('estado')}
-            onChange={(e) => setValue('estado', e.target.value as RoomFormValues['estado'])}
-            error={errors.estado?.message}
+      <div className="space-y-5">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSubmit(handleValidSubmit)(e);
+          }}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+        >
+          <Input
+            label="Número"
+            placeholder="Ej. 101"
+            error={errors.numero?.message}
+            {...register('numero')}
           />
-        ) : null}
-      </form>
+          <Select
+            label="Tipo"
+            placeholder="Selecciona un tipo"
+            options={roomTypeOptions}
+            value={watch('tipo')}
+            onChange={(e) => setValue('tipo', e.target.value as RoomFormValues['tipo'], { shouldValidate: true })}
+            error={errors.tipo?.message}
+          />
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            label="Precio por noche"
+            placeholder="Ej. 1500"
+            error={errors.precio_noche?.message}
+            {...register('precio_noche')}
+          />
+          {allowStatusEdit ? (
+            <Select
+              label="Estado"
+              options={roomStatusOptions}
+              value={watch('estado')}
+              onChange={(e) => setValue('estado', e.target.value as RoomFormValues['estado'])}
+              error={errors.estado?.message}
+            />
+          ) : null}
+        </form>
+
+        <div
+          className={cn(
+            'rounded-xl border p-4',
+            modo === 'edit'
+              ? 'border-slate-200 bg-slate-50/50'
+              : 'border-amber-200 bg-amber-50/60'
+          )}
+          aria-label="Gestión de imágenes"
+        >
+          {modo === 'edit' && initialValue?.id ? (
+            <div className="space-y-5">
+              <RoomImageGrid
+                roomId={initialValue.id}
+                images={images}
+              />
+              <div className="border-t border-dashed border-slate-200" />
+              <RoomImageUploader roomId={initialValue.id} />
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 text-amber-800">
+              <div
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-1 ring-amber-200 flex-shrink-0"
+                aria-hidden="true"
+              >
+                <Lightbulb className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">
+                  Primero crea la habitación para gestionar sus imágenes
+                </p>
+                <p className="text-xs text-amber-700/90">
+                  La relación con la habitación es requerida para asociar archivos. Una vez guardada,{' '}
+                  <Badge className="align-middle" variant="outline">edítala</Badge> para abrir la sección de imágenes y sube fotografías, reordénalas, marca la principal y elimina las que no necesites.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </Dialog>
   );
 }

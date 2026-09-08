@@ -2,6 +2,7 @@ import sequelize, { testConnection } from '../config/database.js';
 import User from './User.js';
 import Room from './Room.js';
 import Reservation from './Reservation.js';
+import RoomImage from './RoomImage.js';
 
 User.hasMany(Reservation, {
   foreignKey: 'usuario_id',
@@ -21,4 +22,16 @@ Reservation.belongsTo(Room, {
   foreignKey: 'habitacion_id',
 });
 
-export { sequelize, testConnection, User, Room, Reservation };
+Room.hasMany(RoomImage, {
+  foreignKey: 'habitacion_id',
+  as: 'imagenes',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+RoomImage.belongsTo(Room, {
+  foreignKey: 'habitacion_id',
+  as: 'habitacion',
+});
+
+export { sequelize, testConnection, User, Room, Reservation, RoomImage };

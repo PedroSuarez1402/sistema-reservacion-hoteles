@@ -3,7 +3,13 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Calendar as CalendarIcon, Search as SearchIcon, Sparkles } from 'lucide-react';
+import {
+  Calendar as CalendarIcon,
+  Search as SearchIcon,
+  Sparkles,
+  CheckCircle2,
+  Hotel,
+} from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,16 +19,19 @@ import {
   Card,
   CardContent,
   Dialog,
+  ImageCarousel,
   Input,
   RoomCard,
   useToast,
 } from '@/components';
 import {
   calculateNights,
+  enrichRoomWithMedia,
   formatCurrency,
   formatDate,
   getTodayIso,
   getTomorrowIso,
+  roomTypeLabels,
 } from '@/lib/utils';
 import {
   useAvailableRooms,
@@ -52,6 +61,26 @@ function HomePage() {
   const createReservation = useCreateReservation();
   const [selectedRoom, setSelectedRoom] = React.useState<Room | null>(null);
   const [bookingDialogOpen, setBookingDialogOpen] = React.useState(false);
+  const [detailRoom, setDetailRoom] = React.useState<Room | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = React.useState(false);
+
+  const todayIso = getTodayIso();
+  const [bookingFechas, setBookingFechas] = React.useState<SearchFormValues>({
+    fecha_inicio: todayIso,
+    fecha_fin: getTomorrowIso(),
+  });
+  const [bookingFechasError, setBookingFechasError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!bookingDialogOpen) return;
+    // Fresh sync on open: prefer current watch values over stale paramsForQuery.
+    setBookingFechas({
+      fecha_inicio: watchFechaInicio || todayIso,
+      fecha_fin: watchFechaFin || getTomorrowIso(),
+    });
+    setBookingFechasError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingDialogOpen]);
 
   const defaultDates = React.useMemo<SearchFormValues>(() => ({
     fecha_inicio: getTodayIso(),
@@ -105,6 +134,21 @@ function HomePage() {
 
   const nights = calculateNights(watchFechaInicio, watchFechaFin);
 
+  function handleViewDetails(rawRoom: Room) {
+    const media = !rawRoom.imagenes || rawRoom.imagenes.length === 0
+      ? enrichRoomWithMedia(rawRoom)
+      : rawRoom;
+    setDetailRoom(media);
+    setDetailDialogOpen(true);
+  }
+
+  function goReserveFromDetails(room: Room) {
+    setDetailDialogOpen(false);
+    setDetailRoom(null);
+    // small delay so detail modal close transition runs
+    window.setTimeout(() => handleBookRoom(room), 120);
+  }
+
   function handleBookRoom(room: Room) {
     if (!isValid) {
       toast.warning('Fechas requeridas', 'Primero selecciona las fechas de tu estancia');
@@ -121,14 +165,28 @@ function HomePage() {
     setBookingDialogOpen(true);
   }
 
+  function validateBookingFechas(next: SearchFormValues): string | null {
+    if (!next.fecha_inicio || !next.fecha_fin) return 'Completa ambas fechas';
+    if (next.fecha_inicio < todayIso) return 'La llegada no puede ser anterior a hoy';
+    if (next.fecha_fin <= next.fecha_inicio) return 'La salida debe ser posterior a la llegada';
+    return null;
+  }
+
+  function handleChangeBookingFecha(field: keyof SearchFormValues, value: string) {
+    setBookingFechas((prev) => {
+      const next = { ...prev, [field]: value } as SearchFormValues;
+      setBookingFechasError(validateBookingFechas(next));
+      return next;
+    });
+  }
+
   async function confirmBooking() {
     if (!selectedRoom) return;
-    const payload = paramsForQuery ?? {
-      fecha_inicio: watchFechaInicio,
-      fecha_fin: watchFechaFin,
-    };
-    if (!payload.fecha_inicio || !payload.fecha_fin) {
-      toast.warning('Fechas incompletas', 'Selecciona una fecha de llegada y salida válidas');
+    const payload = bookingFechas;
+    const err = validateBookingFechas(payload);
+    if (err) {
+      toast.warning('Fechas inválidas', err);
+      setBookingFechasError(err);
       return;
     }
     try {
@@ -155,13 +213,9 @@ function HomePage() {
     }
   }
 
-  const totalEstimate =
-    selectedRoom
-      ? calculateNights(
-          paramsForQuery?.fecha_inicio ?? watchFechaInicio,
-          paramsForQuery?.fecha_fin ?? watchFechaFin
-        ) * Number(selectedRoom.precio_noche)
-      : 0;
+  const bookingNights = calculateNights(bookingFechas.fecha_inicio, bookingFechas.fecha_fin);
+  const bookingTotalEstimate =
+    selectedRoom ? bookingNights * Number(selectedRoom.precio_noche) : 0;
 
   return (
     <div className="flex flex-col gap-16">
@@ -252,7 +306,7 @@ function HomePage() {
           <p className="text-sm text-slate-500">
             {paramsForQuery
               ? 'Resultados según el rango de fechas seleccionado'
-              : 'Explora el inventario. Ajusta las fechas para ver disponibilidad exacta.'}
+              : 'Explora el inventario. Haz clic en cualquier habitación para ver imágenes y detalles, o reserva directamente.'}
           </p>
         </div>
         {!isAuthenticated ? (
@@ -281,6 +335,7 @@ function HomePage() {
               room={room}
               displayActions="booking"
               onBook={handleBookRoom}
+              onViewDetails={handleViewDetails}
               isLoading={createReservation.isPending}
             />
           ))}
@@ -300,10 +355,98 @@ function HomePage() {
       </section>
 
       <Dialog
+        open={detailDialogOpen}
+        onClose={() => setDetailDialogOpen(false)}
+        title={
+          detailRoom
+            ? `Habitación ${detailRoom.numero} · ${
+                roomTypeLabels[detailRoom.tipo] ?? detailRoom.tipo
+              }`
+            : 'Detalle de habitación'
+        }
+        description={detailRoom?.descripcion}
+        size="lg"
+        footer={
+          detailRoom ? (
+            <>
+              <div className="hidden text-left sm:block">
+                <p className="text-xs uppercase tracking-wider text-slate-500">
+                  Precio por noche
+                </p>
+                <p className="text-2xl font-bold text-primary-700">
+                  {formatCurrency(Number(detailRoom.precio_noche))}
+                </p>
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDetailDialogOpen(false);
+                    setDetailRoom(null);
+                  }}
+                >
+                  Cerrar
+                </Button>
+                <Button
+                  variant="success"
+                  onClick={() => goReserveFromDetails(detailRoom)}
+                  disabled={detailRoom.estado !== 'ACTIVA' || createReservation.isPending}
+                  leftIcon={<Hotel className="h-4 w-4" />}
+                >
+                  Reservar esta habitación
+                </Button>
+              </div>
+            </>
+          ) : undefined
+        }
+      >
+        {detailRoom ? (() => {
+          const enrichedDetail = enrichRoomWithMedia(detailRoom);
+          return (
+          <div className="space-y-6">
+            <ImageCarousel
+              images={enrichedDetail.imagenes}
+              aspect="video"
+              autoplay
+              intervalMs={5000}
+              altPrefix={`Habitación ${detailRoom.numero}`}
+            />
+
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Lo que incluye esta habitación
+                </h3>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                  {enrichedDetail.descripcion}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {enrichedDetail.amenidades.map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                  >
+                    <CheckCircle2
+                      className="h-4 w-4 shrink-0 text-emerald-500"
+                      aria-hidden="true"
+                    />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          );
+        })() : null}
+      </Dialog>
+
+      <Dialog
         open={bookingDialogOpen}
         onClose={() => setBookingDialogOpen(false)}
         title="Confirmar reserva"
-        description="Revisa los detalles y confirma tu reserva."
+        description="Ajusta las fechas de tu estancia y revisa el importe antes de confirmar."
         size="md"
         footer={
           <>
@@ -318,6 +461,7 @@ function HomePage() {
               variant="success"
               onClick={confirmBooking}
               loading={createReservation.isPending}
+              disabled={Boolean(bookingFechasError)}
             >
               Confirmar reserva
             </Button>
@@ -350,28 +494,62 @@ function HomePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 p-4 text-sm">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-slate-500">Llegada</p>
-                <p className="mt-1 font-medium text-slate-900">
-                  {formatDate(paramsForQuery?.fecha_inicio ?? watchFechaInicio)}
-                </p>
+            <div className="space-y-3 rounded-xl border border-slate-200 p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input
+                  type="date"
+                  label="Fecha de llegada"
+                  min={todayIso}
+                  value={bookingFechas.fecha_inicio}
+                  onChange={(e) => handleChangeBookingFecha('fecha_inicio', e.target.value)}
+                  leftIcon={<CalendarIcon className="h-4 w-4" />}
+                />
+                <Input
+                  type="date"
+                  label="Fecha de salida"
+                  min={bookingFechas.fecha_inicio || todayIso}
+                  value={bookingFechas.fecha_fin}
+                  onChange={(e) => handleChangeBookingFecha('fecha_fin', e.target.value)}
+                  leftIcon={<CalendarIcon className="h-4 w-4" />}
+                />
               </div>
-              <div>
-                <p className="text-xs uppercase tracking-wider text-slate-500">Salida</p>
-                <p className="mt-1 font-medium text-slate-900">
-                  {formatDate(paramsForQuery?.fecha_fin ?? watchFechaFin)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wider text-slate-500">Noches</p>
-                <p className="mt-1 font-medium text-slate-900">{nights}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs uppercase tracking-wider text-slate-500">Total estimado</p>
-                <p className="mt-1 text-lg font-bold text-primary-700">
-                  {formatCurrency(totalEstimate)}
-                </p>
+
+              {bookingFechasError ? (
+                <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  <span aria-hidden="true">⚠️</span>
+                  <span>{bookingFechasError}</span>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-sm">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Llegada</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {bookingFechas.fecha_inicio ? formatDate(bookingFechas.fecha_inicio) : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Salida</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {bookingFechas.fecha_fin ? formatDate(bookingFechas.fecha_fin) : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Noches</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {bookingFechas.fecha_inicio && bookingFechas.fecha_fin
+                      ? bookingNights
+                      : '—'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Total estimado</p>
+                  <p className="mt-1 text-lg font-bold text-primary-700">
+                    {bookingFechas.fecha_inicio && bookingFechas.fecha_fin
+                      ? formatCurrency(bookingTotalEstimate)
+                      : '—'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

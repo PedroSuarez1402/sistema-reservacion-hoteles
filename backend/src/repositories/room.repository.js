@@ -1,6 +1,16 @@
 import { Op } from 'sequelize';
 import Room from '../models/Room.js';
 import Reservation from '../models/Reservation.js';
+import RoomImage from '../models/RoomImage.js';
+
+const includeImagesQuery = {
+  model: RoomImage,
+  as: 'imagenes',
+  order: [
+    ['orden', 'ASC'],
+    ['createdAt', 'ASC'],
+  ],
+};
 
 class RoomRepository {
   static async create(data) {
@@ -9,11 +19,15 @@ class RoomRepository {
 
   static async getAll(options = {}) {
     const { where = {}, order = [['numero', 'ASC']] } = options;
-    return await Room.findAll({ where, order });
+    return await Room.findAll({
+      where,
+      order,
+      include: [includeImagesQuery],
+    });
   }
 
   static async getById(id) {
-    return await Room.findByPk(id);
+    return await Room.findByPk(id, { include: [includeImagesQuery] });
   }
 
   static async findById(id) {
@@ -21,7 +35,7 @@ class RoomRepository {
   }
 
   static async getByNumero(numero) {
-    return await Room.findOne({ where: { numero } });
+    return await Room.findOne({ where: { numero }, include: [includeImagesQuery] });
   }
 
   static async update(id, data) {
@@ -65,6 +79,7 @@ class RoomRepository {
     return await Room.findAll({
       where: whereClause,
       order: [['numero', 'ASC']],
+      include: [includeImagesQuery],
     });
   }
 

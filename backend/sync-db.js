@@ -6,8 +6,15 @@ async function sync() {
     await sequelize.authenticate();
     console.log('✅ Conexión BD establecida.');
     const force = process.argv.includes('--force');
-    console.log(force ? '⚠️  Sincronizando con force=true (sobrescribe tablas)' : '🔄 Sincronizando tablas (alter: false)');
-    await sequelize.sync({ force, alter: false });
+    const alter = process.argv.includes('--alter');
+    console.log(
+      force
+        ? '⚠️  Sincronizando con force=true (sobrescribe tablas)'
+        : alter
+          ? '🔧 Sincronizando tablas (alter: true)'
+          : '🔄 Sincronizando tablas (alter: false)'
+    );
+    await sequelize.sync({ force, alter: alter || false });
     console.log('✅ Modelos sincronizados correctamente.');
     await sequelize.close();
     process.exit(0);

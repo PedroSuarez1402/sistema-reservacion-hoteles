@@ -113,6 +113,7 @@ function LoginInner() {
               autoComplete="current-password"
               leftIcon={<Lock className="h-4 w-4" />}
               error={errors.password?.message}
+              showPasswordToggle
               {...register('password')}
             />
 

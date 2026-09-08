@@ -1,5 +1,15 @@
 import RoomService from '../services/room.service.js';
 import { BadRequestError } from '../utils/errors.util.js';
+import RoomImageController from './roomImage.controller.js';
+
+function serializeRoom(room) {
+  if (!room) return null;
+  const plain = typeof room.toJSON === 'function' ? room.toJSON() : { ...room };
+  if (Array.isArray(plain.imagenes)) {
+    plain.imagenes = plain.imagenes.map(RoomImageController.serialize);
+  }
+  return plain;
+}
 
 class RoomController {
   static async getAll(req, res, next) {
@@ -8,7 +18,7 @@ class RoomController {
       res.status(200).json({
         success: true,
         message: 'Habitaciones obtenidas correctamente',
-        data: rooms,
+        data: rooms.map(serializeRoom),
       });
     } catch (error) {
       next(error);
@@ -25,7 +35,7 @@ class RoomController {
       res.status(200).json({
         success: true,
         message: 'Habitaciones disponibles obtenidas correctamente',
-        data: rooms,
+        data: rooms.map(serializeRoom),
       });
     } catch (error) {
       next(error);
@@ -39,7 +49,7 @@ class RoomController {
       res.status(200).json({
         success: true,
         message: 'Habitación obtenida correctamente',
-        data: room,
+        data: serializeRoom(room),
       });
     } catch (error) {
       next(error);
@@ -52,7 +62,7 @@ class RoomController {
       res.status(201).json({
         success: true,
         message: 'Habitación creada correctamente',
-        data: room,
+        data: serializeRoom(room),
       });
     } catch (error) {
       next(error);
@@ -66,7 +76,7 @@ class RoomController {
       res.status(200).json({
         success: true,
         message: 'Habitación actualizada correctamente',
-        data: room,
+        data: serializeRoom(room),
       });
     } catch (error) {
       next(error);

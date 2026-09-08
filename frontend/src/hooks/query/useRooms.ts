@@ -13,6 +13,7 @@ import type {
   CreateRoomPayload,
   Room,
   RoomAvailabilityParams,
+  RoomImage,
   UpdateRoomPayload,
 } from '../../types';
 import { queryKeys, STALE_TIMES } from './queryKeys';
@@ -65,6 +66,50 @@ export type UseUpdateRoomOptions = Omit<
 export type UseDeleteRoomOptions = Omit<
   UseMutationOptions<void, ApiErrorResponse, string, unknown>,
   'mutationFn' | 'mutationKey' | 'onMutate' | 'onSuccess' | 'onError' | 'onSettled'
+>;
+
+export type UseUploadRoomImagesOptions = Omit<
+  UseMutationOptions<
+    RoomImage[],
+    ApiErrorResponse,
+    {
+      roomId: string;
+      files: File[];
+      onProgress?: (file: File, percent: number) => void;
+    },
+    unknown
+  >,
+  'mutationFn' | 'mutationKey'
+>;
+
+export type UseReorderRoomImagesOptions = Omit<
+  UseMutationOptions<
+    RoomImage[],
+    ApiErrorResponse,
+    { roomId: string; ids: string[] },
+    { previousRoom?: Room }
+  >,
+  'mutationFn' | 'mutationKey' | 'onMutate'
+>;
+
+export type UseSetMainRoomImageOptions = Omit<
+  UseMutationOptions<
+    RoomImage[],
+    ApiErrorResponse,
+    { roomId: string; imageId: string },
+    { previousRoom?: Room }
+  >,
+  'mutationFn' | 'mutationKey' | 'onMutate'
+>;
+
+export type UseDeleteRoomImageOptions = Omit<
+  UseMutationOptions<
+    void,
+    ApiErrorResponse,
+    { roomId: string; imageId: string },
+    { previousRoom?: Room }
+  >,
+  'mutationFn' | 'mutationKey' | 'onMutate'
 >;
 
 /**
@@ -316,3 +361,201 @@ export function useDeleteRoom(options: UseDeleteRoomOptions = {}) {
     },
   });
 }
+
+export function useUploadRoomImages(options: UseUploadRoomImagesOptions = {}) {
+  const queryClient = useQueryClient();
+  const listKey = queryKeys.rooms.lists();
+
+  return useMutation<
+    RoomImage[],
+    ApiErrorResponse,
+    { roomId: string; files: File[]; onProgress?: (file: File, percent: number) => void },
+    unknown
+  >({
+    ...options,
+    mutationKey: ['rooms', 'uploadImages'],
+    mutationFn: ({ roomId, files, onProgress }) =>
+      roomService.uploadImages(roomId, files, onProgress),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.rooms.detail(variables.roomId),
+      });
+      await queryClient.invalidateQueries({ queryKey: listKey });
+    },
+    onSettled: async (_data, _err, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.rooms.detail(variables.roomId),
+      });
+      await queryClient.invalidateQueries({ queryKey: listKey });
+    },
+  });
+}
+
+export function useReorderRoomImages(options: UseReorderRoomImagesOptions = {}) {
+  const queryClient = useQueryClient();
+  const listKey = queryKeys.rooms.lists();
+
+  return useMutation<
+    RoomImage[],
+    ApiErrorResponse,
+    { roomId: string; ids: string[] },
+    { previousRoom?: Room }
+  >({
+    ...options,
+    mutationKey: ['rooms', 'reorderImages'],
+    mutationFn: ({ roomId, ids }) => roomService.reorderImages(roomId, ids),
+    onMutate: async ({ roomId, ids }) => {
+      const detailKey = queryKeys.rooms.detail(roomId);
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: listKey }),
+        queryClient.cancelQueries({ queryKey: detailKey }),
+      ]);
+      const previousRoom = queryClient.getQueryData<Room | undefined>(detailKey);
+      if (previousRoom?.imagenes) {
+        const byId = new Map(previousRoom.imagenes.map((i) => [i.id, i]));
+        const sorted: RoomImage[] = [];
+        ids.forEach((id: string, idx: number) => {
+          const img = byId.get(id);
+          if (img) sorted.push({ ...img, orden: idx });
+        });
+        previousRoom.imagenes
+          .filter((i) => !ids.includes(i.id))
+          .forEach((img) => sorted.push({ ...img, orden: sorted.length }));
+        queryClient.setQueryData<Room>(detailKey, {
+          ...previousRoom,
+          imagenes: sorted,
+        });
+      }
+      return { previousRoom };
+    },
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.rooms.detail(variables.roomId),
+      });
+      await queryClient.invalidateQueries({ queryKey: listKey });
+    },
+    onError: (_err, variables, context) => {
+      const detailKey = queryKeys.rooms.detail(variables.roomId);
+      if (context?.previousRoom) {
+        queryClient.setQueryData<Room>(detailKey, context.previousRoom);
+      }
+    },
+    onSettled: async (_data, _err, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.rooms.detail(variables.roomId),
+      });
+      await queryClient.invalidateQueries({ queryKey: listKey });
+    },
+  });
+}
+
+export function useSetMainRoomImage(options: UseSetMainRoomImageOptions = {}) {
+  const queryClient = useQueryClient();
+  const listKey = queryKeys.rooms.lists();
+
+  return useMutation<
+    RoomImage[],
+    ApiErrorResponse,
+    { roomId: string; imageId: string },
+    { previousRoom?: Room }
+  >({
+    ...options,
+    mutationKey: ['rooms', 'setMainImage'],
+    mutationFn: ({ roomId, imageId }) => roomService.setMainImage(roomId, imageId),
+    onMutate: async ({ roomId, imageId }) => {
+      const detailKey = queryKeys.rooms.detail(roomId);
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: listKey }),
+        queryClient.cancelQueries({ queryKey: detailKey }),
+      ]);
+      const previousRoom = queryClient.getQueryData<Room | undefined>(detailKey);
+      if (previousRoom?.imagenes) {
+        const updated = previousRoom.imagenes.map((i) => ({
+          ...i,
+          es_principal: i.id === imageId,
+        }));
+        queryClient.setQueryData<Room>(detailKey, {
+          ...previousRoom,
+          imagenes: updated,
+        });
+      }
+      return { previousRoom };
+    },
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.rooms.detail(variables.roomId),
+      });
+      await queryClient.invalidateQueries({ queryKey: listKey });
+    },
+    onError: (_err, variables, context) => {
+      const detailKey = queryKeys.rooms.detail(variables.roomId);
+      if (context?.previousRoom) {
+        queryClient.setQueryData<Room>(detailKey, context.previousRoom);
+      }
+    },
+    onSettled: async (_data, _err, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.rooms.detail(variables.roomId),
+      });
+      await queryClient.invalidateQueries({ queryKey: listKey });
+    },
+  });
+}
+
+export function useDeleteRoomImage(options: UseDeleteRoomImageOptions = {}) {
+  const queryClient = useQueryClient();
+  const listKey = queryKeys.rooms.lists();
+
+  return useMutation<
+    void,
+    ApiErrorResponse,
+    { roomId: string; imageId: string },
+    { previousRoom?: Room }
+  >({
+    ...options,
+    mutationKey: ['rooms', 'deleteImage'],
+    mutationFn: ({ roomId, imageId }) => roomService.deleteImage(roomId, imageId),
+    onMutate: async ({ roomId, imageId }) => {
+      const detailKey = queryKeys.rooms.detail(roomId);
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: listKey }),
+        queryClient.cancelQueries({ queryKey: detailKey }),
+      ]);
+      const previousRoom = queryClient.getQueryData<Room | undefined>(detailKey);
+      if (previousRoom?.imagenes) {
+        const removed = previousRoom.imagenes.find((i) => i.id === imageId);
+        let newList = previousRoom.imagenes.filter((i) => i.id !== imageId);
+        if (removed?.es_principal && newList.length > 0) {
+          newList = newList.map((i, idx) => ({
+            ...i,
+            es_principal: idx === 0,
+          }));
+        }
+        queryClient.setQueryData<Room>(detailKey, {
+          ...previousRoom,
+          imagenes: newList,
+        });
+      }
+      return { previousRoom };
+    },
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.rooms.detail(variables.roomId),
+      });
+      await queryClient.invalidateQueries({ queryKey: listKey });
+    },
+    onError: (_err, variables, context) => {
+      const detailKey = queryKeys.rooms.detail(variables.roomId);
+      if (context?.previousRoom) {
+        queryClient.setQueryData<Room>(detailKey, context.previousRoom);
+      }
+    },
+    onSettled: async (_data, _err, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.rooms.detail(variables.roomId),
+      });
+      await queryClient.invalidateQueries({ queryKey: listKey });
+    },
+  });
+}
+
