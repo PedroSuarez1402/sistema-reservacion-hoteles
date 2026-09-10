@@ -6,7 +6,7 @@ import axios, {
 } from 'axios';
 import type { ApiErrorResponse } from '../types';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 const TOKEN_KEY = 'hotel_auth_token';
 const TOKEN_COOKIE = 'hotel_auth_token';

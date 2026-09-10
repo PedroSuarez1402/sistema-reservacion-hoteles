@@ -14,8 +14,23 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+function toLocalDate(date: string | Date): Date {
+  if (date instanceof Date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+  }
+  const str = (date || '').trim();
+  if (!str) return new Date(NaN);
+  const isoDateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (isoDateMatch) {
+    const [, y, m, d] = isoDateMatch;
+    return new Date(Number(y), Number(m) - 1, Number(d), 0, 0, 0, 0);
+  }
+  const d = new Date(str);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+}
+
 export function formatDate(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
+  const d = toLocalDate(date);
   return d.toLocaleDateString('es-MX', {
     year: 'numeric',
     month: 'short',
@@ -33,20 +48,25 @@ export function formatBytes(bytes: number, decimals = 1): string {
 }
 
 export function calculateNights(fechaInicio: string, fechaFin: string): number {
-  const inicio = new Date(fechaInicio);
-  const fin = new Date(fechaFin);
+  const inicio = toLocalDate(fechaInicio);
+  const fin = toLocalDate(fechaFin);
   const diffMs = fin.getTime() - inicio.getTime();
-  return Math.max(1, Math.ceil(diffMs / 86400000));
+  return Math.max(1, Math.round(diffMs / 86400000));
+}
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
 }
 
 export function getTodayIso(): string {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
 export function getTomorrowIso(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0];
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
 export const reservationStatusStyles: Record<
