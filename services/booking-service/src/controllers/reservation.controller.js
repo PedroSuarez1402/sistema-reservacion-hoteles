@@ -1,5 +1,5 @@
 import ReservationService from '../services/reservation.service.js';
-import { ForbiddenError, InternalServerError } from '../utils/errors.util.js';
+import { BadRequestError, ForbiddenError, InternalServerError } from '../utils/errors.util.js';
 
 function logControllerError(context, error, req) {
   const now = new Date().toISOString();
@@ -80,7 +80,7 @@ class ReservationController {
   // Crea una nueva reservación
   static async create(req, res, next) {
     try {
-      const { habitacion_id, fecha_inicio, fecha_fin, estado } = req.body;
+      const { habitacion_id, fecha_inicio, fecha_fin, estado, precio_total } = req.body;
       const usuario_id = req.user.id;
 
       const nuevaReserva = await ReservationService.createReservation({
@@ -89,6 +89,7 @@ class ReservationController {
         fecha_inicio,
         fecha_fin,
         estado,
+        precio_total,
       });
 
       res.status(201).json({
@@ -98,6 +99,12 @@ class ReservationController {
       });
     } catch (error) {
       logControllerError('Reservation.create', error, req);
+      if (error && error.name === 'RoomServiceUnavailableError') {
+        return next(new InternalServerError(error.message));
+      }
+      if (error && error.name === 'RoomNotFoundError') {
+        return next(new BadRequestError(error.message));
+      }
       next(error);
     }
   }

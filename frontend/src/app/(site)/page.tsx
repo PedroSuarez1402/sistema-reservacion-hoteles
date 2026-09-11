@@ -194,6 +194,7 @@ function HomePage() {
         habitacion_id: selectedRoom.id,
         fecha_inicio: payload.fecha_inicio,
         fecha_fin: payload.fecha_fin,
+        precio_total: Number(bookingTotalEstimate.toFixed(2)),
       });
       toast.success(
         '¡Reserva exitosa!',

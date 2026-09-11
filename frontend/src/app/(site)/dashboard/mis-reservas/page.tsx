@@ -16,9 +16,45 @@ import {
   ReservationTable,
   useToast,
 } from '@/components';
-import { useCancelReservation, useMyReservations } from '@/hooks';
+import { useCancelReservation, useMyReservations, useRooms } from '@/hooks';
 import { calculateNights, formatCurrency, formatDate } from '@/lib/utils';
-import type { ApiErrorResponse, Reservation } from '@/types';
+import type { ApiErrorResponse, Reservation, Room } from '@/types';
+
+function getRoomByIdLookup(rooms: Room[] | undefined): Record<string, Room> {
+  const map: Record<string, Room> = {};
+  if (!rooms) return map;
+  for (const r of rooms) map[r.id] = r;
+  return map;
+}
+
+function enrichReservations(
+  reservations: Reservation[] | undefined,
+  roomById: Record<string, Room>
+): Reservation[] {
+  if (!reservations) return [];
+  return reservations.map((r) => {
+    const room = roomById[r.habitacion_id];
+    const noches = calculateNights(r.fecha_inicio, r.fecha_fin);
+    const precioDesdeBD = Number(r.precio_total);
+    const precioCalculado =
+      precioDesdeBD && Number.isFinite(precioDesdeBD) && precioDesdeBD > 0
+        ? precioDesdeBD
+        : room
+        ? Number((Number(room.precio_noche) * noches).toFixed(2))
+        : 0;
+    return {
+      ...r,
+      precio_total: precioCalculado,
+      habitacion: room
+        ? {
+            ...room,
+            numero: room.numero,
+            tipo: room.tipo,
+          }
+        : r.habitacion,
+    };
+  });
+}
 
 function SummaryCards({ reservations }: { reservations: Reservation[] }) {
   const total = reservations.length;
@@ -84,15 +120,28 @@ function MyReservationsPage() {
   const toast = useToast();
   const {
     data: reservations,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
+    isLoading: isReservationsLoading,
+    isFetching: isReservationsFetching,
+    isError: isReservationsError,
+    error: reservationsError,
+    refetch: refetchReservations,
   } = useMyReservations();
+  const { data: rooms, isLoading: isRoomsLoading } = useRooms();
   const cancelMutation = useCancelReservation();
 
   const [confirmCancelId, setConfirmCancelId] = React.useState<Reservation | null>(null);
+
+  const roomById = React.useMemo(() => getRoomByIdLookup(rooms), [rooms]);
+  const enrichedReservations = React.useMemo(
+    () => enrichReservations(reservations, roomById),
+    [reservations, roomById]
+  );
+
+  const isLoading = isReservationsLoading || isRoomsLoading;
+  const isFetching = isReservationsFetching;
+  const isError = isReservationsError;
+  const error = reservationsError;
+  const refetch = refetchReservations;
 
   React.useEffect(() => {
     if (isError) {
@@ -144,12 +193,12 @@ function MyReservationsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <SummaryCards reservations={reservations ?? []} />
+          <SummaryCards reservations={enrichedReservations} />
         </CardContent>
       </Card>
 
       <ReservationTable
-        reservations={reservations}
+        reservations={enrichedReservations}
         isLoading={isLoading || isFetching}
         isStaff={false}
         showRoomInfo={true}

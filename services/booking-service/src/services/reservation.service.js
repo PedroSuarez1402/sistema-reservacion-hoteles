@@ -3,10 +3,12 @@ import {
   BadRequestError,
   ConflictError,
   ForbiddenError,
+  InternalServerError,
   NotFoundError,
   UnprocessableEntityError,
   assertRequired,
 } from '../utils/errors.util.js';
+import { getRoomById, RoomNotFoundError, RoomServiceUnavailableError } from '../clients/room-client.js';
 
 // Regex UUID v4 + UUIDs legacy ceros (seed: xxxxxxxx-0000-0000-0000-xxxxxxxxxxxx)
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -20,6 +22,66 @@ function parseLocalDate(input) {
     }
     const d = new Date(str);
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+}
+
+// Consulta room-service por precio_noche. Devuelve Number(precio_noche) o lanza error.
+async function resolvePrecioNoche(habitacionId, op = { silentIfMissing: false }) {
+    let room = null;
+    try {
+        room = await getRoomById(habitacionId);
+    } catch (err) {
+        if (err instanceof RoomServiceUnavailableError) {
+            if (op.silentIfMissing) return null;
+            throw new InternalServerError(
+                `No se pudo calcular el precio total: ${err.message}`
+            );
+        }
+        throw err;
+    }
+    if (!room) {
+        if (op.silentIfMissing) return null;
+        throw new NotFoundError(
+            `No se pudo calcular el precio total: la habitación (${habitacionId}) no existe en el catálogo.`
+        );
+    }
+    const precioNoche = Number(room.precio_noche);
+    if (!Number.isFinite(precioNoche) || precioNoche <= 0) {
+        if (op.silentIfMissing) return null;
+        throw new BadRequestError(
+            `No se pudo calcular el precio total: la habitación ${room.numero ? `#${room.numero}` : ''} tiene un precio por noche inválido.`
+        );
+    }
+    return precioNoche;
+}
+
+// Calcula precio_total final validando y usando fallback REST contra room-service.
+async function calcularPrecioTotal({ precioTotalInput, habitacionId, diasReserva, allowRemoteLookup = true, precioNocheLocal = null }) {
+    let precioNum = Number(precioTotalInput);
+    const vieneInput =
+        precioTotalInput !== undefined &&
+        precioTotalInput !== null &&
+        precioTotalInput !== '' &&
+        !Number.isNaN(precioNum);
+    if (vieneInput) {
+        if (!Number.isFinite(precioNum) || precioNum <= 0) {
+            throw new BadRequestError('El precio total debe ser mayor a 0');
+        }
+        return Number(precioNum.toFixed(2));
+    }
+    if (!allowRemoteLookup) {
+        // No hay precio explícito y no está permitido consultar catálogo: error, pero intentamos usar precioNoche local si lo pasaron.
+        if (precioNocheLocal && Number.isFinite(Number(precioNocheLocal)) && Number(precioNocheLocal) > 0) {
+            return Number((Number(precioNocheLocal) * diasReserva).toFixed(2));
+        }
+        throw new BadRequestError('El precio total es requerido');
+    }
+    const precioNoche = precioNocheLocal && Number(precioNocheLocal) > 0
+        ? Number(precioNocheLocal)
+        : await resolvePrecioNoche(habitacionId);
+    if (precioNoche === null || !Number.isFinite(precioNoche) || precioNoche <= 0) {
+        throw new BadRequestError('El precio total es requerido y no se pudo calcular automáticamente. Por favor inténtalo de nuevo.');
+    }
+    return Number((precioNoche * diasReserva).toFixed(2));
 }
 
 // Servicio lógica negocio Reservaciones (DESACOPLADO de Room - UUID simple)
@@ -64,16 +126,18 @@ class ReservationService {
 
         const diferenciaMilisegundos = fin.getTime() - inicio.getTime();
         const diasReserva = Math.max(1, Math.round(diferenciaMilisegundos / (1000 * 60 * 60 * 24)));
-        const precioCalculado = precio_total
-            ? Number(precio_total)
-            : (Number(data.precio_noche ?? 0) * diasReserva);
+        const precioGuardar = await calcularPrecioTotal({
+            precioTotalInput: precio_total,
+            habitacionId: hid,
+            diasReserva,
+        });
 
         const nuevaReserva = await ReservationRepository.create({
             usuario_id,
             habitacion_id: hid,
             fecha_inicio,
             fecha_fin,
-            precio_total: Number(precioCalculado.toFixed(2)),
+            precio_total: precioGuardar,
             estado: estado || 'CONFIRMADA',
         });
 
@@ -190,10 +254,33 @@ class ReservationService {
             fecha_inicio: nuevaFechaInicio,
             fecha_fin: nuevaFechaFin,
         };
-        if (data.precio_total !== undefined) {
-            updateData.precio_total = Number(Number(data.precio_total).toFixed(2));
-        } else if (data.precio_noche !== undefined) {
-            updateData.precio_total = Number((Number(data.precio_noche) * diasReserva).toFixed(2));
+        const precioInput = data.precio_total;
+        const vienePrecioInput =
+            precioInput !== undefined && precioInput !== null && precioInput !== '';
+        const cambiaFechas =
+            data.fecha_inicio !== undefined || data.fecha_fin !== undefined;
+        const cambiaHabitacion =
+            data.habitacion_id !== undefined &&
+            data.habitacion_id !== null &&
+            data.habitacion_id !== '';
+        const precioAnteriorInvalido =
+            reserva.precio_total === undefined ||
+            reserva.precio_total === null ||
+            !Number.isFinite(Number(reserva.precio_total)) ||
+            Number(reserva.precio_total) <= 0;
+
+        if (vienePrecioInput) {
+            const precioUpdate = Number(precioInput);
+            if (Number.isNaN(precioUpdate) || !Number.isFinite(precioUpdate) || precioUpdate <= 0) {
+                throw new BadRequestError('El precio total debe ser mayor a 0');
+            }
+            updateData.precio_total = Number(precioUpdate.toFixed(2));
+        } else if (cambiaHabitacion || cambiaFechas || precioAnteriorInvalido) {
+            updateData.precio_total = await calcularPrecioTotal({
+                precioTotalInput: undefined,
+                habitacionId: nuevoHabitacionId,
+                diasReserva,
+            });
         }
         if (data.estado && esAdminORecepcion) updateData.estado = data.estado;
 
