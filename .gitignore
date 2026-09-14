@@ -15,6 +15,21 @@ frontend/**/*.spec.*
 /coverage/
 
 # ============================================================
+# HIGIENE DE GIT (TRAE WORKSPACE / MICROSERVICIOS)
+# ============================================================
+# Carpeta interna de TRAE (configuración workspace)
+.trae/
+
+# Microservicios en /services: ignorar node_modules y .env por servicio
+services/*/node_modules/
+services/*/.env
+
+# Frontend (ya existían abajo, pero se mantienen aquí por claridad — las entradas
+# originales en sección FRONTEND siguen siendo válidas y equivalentes):
+#   frontend/.next/      → línea 38
+#   frontend/node_modules/ → línea 34
+
+# ============================================================
 # BACKEND (Node.js / Express)
 # ============================================================
 backend/node_modules/
