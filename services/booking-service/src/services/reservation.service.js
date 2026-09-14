@@ -1,3 +1,8 @@
+/**
+ * Capa de Servicio para Reservaciones (Booking Service)
+ * Coordina la verificación de disponibilidad y actúa como DIRECTOR del patrón Builder.
+ */
+
 import ReservationRepository from '../repositories/reservation.repository.js';
 import {
   BadRequestError,
@@ -9,11 +14,10 @@ import {
   assertRequired,
 } from '../utils/errors.util.js';
 import { getRoomById, RoomNotFoundError, RoomServiceUnavailableError } from '../clients/room-client.js';
+import ReservationBuilder from '../builders/reservation.builder.js';
 
-// Regex UUID v4 + UUIDs legacy ceros (seed: xxxxxxxx-0000-0000-0000-xxxxxxxxxxxx)
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Interpreta un YYYY-MM-DD como FECHA LOCAL (no UTC), evitando off-by-1 día por timezone.
 function parseLocalDate(input) {
     const str = String(input || '').trim();
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
@@ -24,7 +28,9 @@ function parseLocalDate(input) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
 }
 
-// Consulta room-service por precio_noche. Devuelve Number(precio_noche) o lanza error.
+/**
+ * Consulta el precio por noche comunicándose por HTTP con Room Service.
+ */
 async function resolvePrecioNoche(habitacionId, op = { silentIfMissing: false }) {
     let room = null;
     try {
@@ -54,7 +60,9 @@ async function resolvePrecioNoche(habitacionId, op = { silentIfMissing: false })
     return precioNoche;
 }
 
-// Calcula precio_total final validando y usando fallback REST contra room-service.
+/**
+ * Calcula el total a pagar según las noches y el precio unitario.
+ */
 async function calcularPrecioTotal({ precioTotalInput, habitacionId, diasReserva, allowRemoteLookup = true, precioNocheLocal = null }) {
     let precioNum = Number(precioTotalInput);
     const vieneInput =
@@ -86,9 +94,12 @@ async function calcularPrecioTotal({ precioTotalInput, habitacionId, diasReserva
 
 // Servicio lógica negocio Reservaciones (DESACOPLADO de Room - UUID simple)
 class ReservationService {
-    // Crea nueva reservación validando disponibilidad (habitacion_id=UUID agnóstico)
+    /**
+   * Crea una reservación utilizando ReservationBuilder (Patrón Builder).
+   * ReservationService actúa como DIRECTOR orquestando los pasos de ensamblado.
+   */
     static async createReservation(data) {
-        const { usuario_id, habitacion_id, fecha_inicio, fecha_fin, estado, precio_total } = data;
+        const { usuario_id, habitacion_id, fecha_inicio, fecha_fin, estado, precio_total, notas } = data;
 
         assertRequired(usuario_id, 'El usuario es requerido');
         assertRequired(habitacion_id, 'La habitación es requerida');
@@ -132,14 +143,19 @@ class ReservationService {
             diasReserva,
         });
 
-        const nuevaReserva = await ReservationRepository.create({
-            usuario_id,
-            habitacion_id: hid,
-            fecha_inicio,
-            fecha_fin,
-            precio_total: precioGuardar,
-            estado: estado || 'CONFIRMADA',
-        });
+        // ---- Uso de ReservationBuilder (Director construye paso a paso) ----
+        const builder = new ReservationBuilder()
+            .conHuesped(usuario_id)
+            .paraHabitacion(hid)
+            .conFechas(fecha_inicio, fecha_fin)
+            .conTotalManual(precioGuardar)
+            .conEstado(estado || 'CONFIRMADA');
+        if (notas) builder.conNotas(notas);
+
+        // build() valida campos obligatorios y regresa payload compatible con Sequelize
+        const payloadRepo = builder.build();
+
+        const nuevaReserva = await ReservationRepository.create(payloadRepo);
 
         return await ReservationRepository.getById(nuevaReserva.id);
     }
@@ -269,6 +285,9 @@ class ReservationService {
             !Number.isFinite(Number(reserva.precio_total)) ||
             Number(reserva.precio_total) <= 0;
 
+        /**
+         * Valida y actualiza el precio total si se proporciona.
+         */
         if (vienePrecioInput) {
             const precioUpdate = Number(precioInput);
             if (Number.isNaN(precioUpdate) || !Number.isFinite(precioUpdate) || precioUpdate <= 0) {
@@ -282,6 +301,7 @@ class ReservationService {
                 diasReserva,
             });
         }
+        // Actualizar estado si es administrador o recepción y estado es válido
         if (data.estado && esAdminORecepcion) updateData.estado = data.estado;
 
         await ReservationRepository.update(id, updateData);
@@ -289,7 +309,9 @@ class ReservationService {
         return await ReservationRepository.getById(id);
     }
 
-    // Elimina reservación validando permisos de usuario
+    /**
+     * Elimina una reservación validando permisos de usuario.
+     */
     static async deleteReservation(id, usuarioQueSolicita, esAdminFlag = null) {
         assertRequired(id, 'El id de la reserva es requerido');
 
