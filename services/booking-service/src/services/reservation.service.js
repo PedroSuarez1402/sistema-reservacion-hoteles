@@ -157,7 +157,70 @@ class ReservationService {
 
         const nuevaReserva = await ReservationRepository.create(payloadRepo);
 
-        return await ReservationRepository.getById(nuevaReserva.id);
+        // =====================================================================
+        // Publicación de Evento al Message Broker (Patrón Pub/Sub - Publisher)
+        // =====================================================================
+        const RESERVA_COMPLETA = await ReservationRepository.getById(nuevaReserva.id);
+        const BROKER_URL = process.env.BROKER_URL || 'http://localhost:4003';
+        const brokerEvento = {
+            topico: 'RESERVA_CREADA',
+            payload: {
+                id: RESERVA_COMPLETA.id,
+                usuario_id: RESERVA_COMPLETA.usuario_id,
+                habitacion_id: RESERVA_COMPLETA.habitacion_id,
+                fecha_inicio: RESERVA_COMPLETA.fecha_inicio,
+                fecha_fin: RESERVA_COMPLETA.fecha_fin,
+                noches: Math.max(1, Math.round(
+                    (parseLocalDate(RESERVA_COMPLETA.fecha_fin) - parseLocalDate(RESERVA_COMPLETA.fecha_inicio)) /
+                    (1000 * 60 * 60 * 24)
+                )),
+                precio_total: Number(RESERVA_COMPLETA.precio_total),
+                estado: RESERVA_COMPLETA.estado,
+                creado_en: RESERVA_COMPLETA.createdAt || new Date().toISOString(),
+            },
+            publishedBy: 'booking-service',
+        };
+        // Emisión asíncrona no bloqueante (Fire-and-forget con timeout de 5s)
+        setImmediate(function publishEventoReservaCreadaNoBloqueante() {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 5000);
+            fetch(`${BROKER_URL}/api/broker/publish`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-publisher': 'booking-service' },
+                body: JSON.stringify(brokerEvento),
+                signal: controller.signal,
+            })
+                .then(async (r) => {
+                    if (!r.ok) {
+                        try {
+                            const body = await r.json().catch(() => null);
+                            console.warn(
+                                `⚠️  [Pub/Sub] Broker respondió ${r.status} al publicar RESERVA_CREADA ${RESERVA_COMPLETA.id}. Body=`,
+                                body
+                            );
+                        } catch (_) { /* ignore json parse */ }
+                        return;
+                    }
+                    try {
+                        const body = await r.json().catch(() => null);
+                        console.log(
+                            `📨 [Pub/Sub] RESERVA_CREADA ${RESERVA_COMPLETA.id} → Broker ✔ ` +
+                            (body && body.eventId ? `eventId=${body.eventId} ` : '') +
+                            (body && body.pendingSubscribers ? `subs=${body.pendingSubscribers}` : '')
+                        );
+                    } catch (_) { /* ignore */ }
+                })
+                .catch(function onBrokerNoDisponible(err) {
+                    console.warn(
+                        `⚠️  [Pub/Sub] Broker no disponible en ${BROKER_URL} al publicar RESERVA_CREADA ${RESERVA_COMPLETA.id}. ` +
+                        `(no crítico, reserva persistida OK). Error: ${err && err.code ? err.code : (err && err.message) || err}`
+                    );
+                })
+                .finally(() => clearTimeout(timer));
+        });
+        // ================== [FIN Pub/Sub Async] ===============================
+
+        return RESERVA_COMPLETA;
     }
 
     // Obtiene lista todas las reservaciones con filtros

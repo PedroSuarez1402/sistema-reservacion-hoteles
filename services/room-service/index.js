@@ -44,6 +44,42 @@ async function bootstrap() {
 
     server.listen(PORT, function onListen() {
       printBanner(PORT);
+
+      // =====================================================================
+      // Registro de Suscripción en el Message Broker (Subscriber)
+      // =====================================================================
+      const BROKER_URL = process.env.BROKER_URL || 'http://localhost:4003';
+      const SELF_SUBSCRIBER_URL = process.env.ROOM_SERVICE_URL || `http://localhost:${PORT}/api/events`;
+      const subscription = { topico: 'RESERVA_CREADA', subscriberUrl: SELF_SUBSCRIBER_URL };
+      setImmediate(function autoSubscribeToBroker() {
+        fetch(`${BROKER_URL}/api/broker/subscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(subscription),
+        }).then(async (resp) => {
+          try {
+            const body = await resp.json().catch(() => null);
+            if (resp.ok) {
+              console.log(
+                `📡 [Pub/Sub] ROOM-SERVICE suscrito a 'RESERVA_CREADA' ✔ ` +
+                `(broker=${BROKER_URL} → subscriber=${SELF_SUBSCRIBER_URL})` +
+                (body && body.info ? `  [${body.info}]` : '')
+              );
+            } else {
+              console.warn(
+                `⚠️  [Pub/Sub] Broker respondió ${resp.status} al suscribir. Body=`,
+                body
+              );
+            }
+          } catch (_) { /* ignore */ }
+        }).catch(function onBrokerDown(err) {
+          console.warn(
+            `⚠️  [Pub/Sub] Broker no disponible en ${BROKER_URL}. ` +
+            `No se realizó auto-suscripción a RESERVA_CREADA. ` +
+            `Levanta message-broker o verifica URL. Error: ${err && err.code ? err.code : err.message || err}`
+          );
+        });
+      });
     });
 
     async function gracefulShutdown(signal) {
