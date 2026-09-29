@@ -80,12 +80,13 @@ class ReservationController {
   // Crea una nueva reservación
   static async create(req, res, next) {
     try {
-      const { habitacion_id, fecha_inicio, fecha_fin, estado } = req.body;
+      const { habitacion_id, paquete_id, fecha_inicio, fecha_fin, estado } = req.body;
       const usuario_id = req.user.id;
 
       const nuevaReserva = await ReservationService.createReservation({
         usuario_id,
         habitacion_id,
+        paquete_id,
         fecha_inicio,
         fecha_fin,
         estado,

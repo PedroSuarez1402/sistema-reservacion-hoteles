@@ -5,6 +5,9 @@ import Reservation from './Reservation.js';
 import RoomImage from './RoomImage.js';
 import Tag from './Tag.js';
 import HabitacionEtiqueta from './HabitacionEtiqueta.js';
+import Servicio from './Servicio.js';
+import Paquete from './Paquete.js';
+import PaqueteServicio from './PaqueteServicio.js';
 
 // =========================================================
 //  ASOCIACIONES CENTRALIZADAS (evita dependencias cíclicas)
@@ -62,6 +65,31 @@ Tag.belongsToMany(Room, {
   onDelete: 'CASCADE',
 });
 
+// --- Paquete <--N:M--> Servicio (a través de PaqueteServicio) ---
+Paquete.belongsToMany(Servicio, {
+  through: PaqueteServicio,
+  as: 'servicios',
+  foreignKey: 'paquete_id',
+  otherKey: 'servicio_id',
+  onDelete: 'CASCADE',
+});
+Servicio.belongsToMany(Paquete, {
+  through: PaqueteServicio,
+  as: 'paquetes',
+  foreignKey: 'servicio_id',
+  otherKey: 'paquete_id',
+  onDelete: 'CASCADE',
+});
+
+// --- Paquete <--> Reservación ---
+Reservation.belongsTo(Paquete, {
+  foreignKey: 'paquete_id',
+  as: 'paquete',
+});
+Paquete.hasMany(Reservation, {
+  foreignKey: 'paquete_id',
+});
+
 export {
   sequelize,
   testConnection,
@@ -71,4 +99,8 @@ export {
   RoomImage,
   Tag,
   HabitacionEtiqueta,
+  Servicio,
+  Paquete,
+  PaqueteServicio,
 };
+

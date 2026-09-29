@@ -18,6 +18,14 @@ async function runUndo() {
     const r1 = await Reservation.destroy({ where: {}, truncate: options });
     console.log(`   → ${r1} registros eliminados.`);
 
+    try {
+      const { PaqueteServicio, Paquete, Servicio } = await import('../models/index.js');
+      await PaqueteServicio.destroy({ where: {}, truncate: options });
+      await Paquete.destroy({ where: {}, truncate: options });
+      await Servicio.destroy({ where: {}, truncate: options });
+      console.log('   → Paquetes y servicios eliminados.');
+    } catch (_) {}
+
     console.log('🗑️  Eliminando habitaciones...');
     const r2 = await Room.destroy({ where: {}, truncate: options });
     console.log(`   → ${r2} registros eliminados.`);

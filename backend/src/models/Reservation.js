@@ -27,6 +27,14 @@ Reservation.init(
         key: 'id',
       },
     },
+    paquete_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'paquetes',
+        key: 'id',
+      },
+    },
     fecha_inicio: {
       type: DataTypes.DATEONLY,
       allowNull: false,
@@ -69,8 +77,12 @@ Reservation.init(
       },
     },
     hooks: {
-      // Hook: calcula precio_total según noches y precio habitación
+      // Hook: calcula precio_total según noches y precio habitación (si no se asignó previamente)
       beforeCreate: async (reservation) => {
+        if (reservation.precio_total && parseFloat(reservation.precio_total) > 0) {
+          return;
+        }
+
         const { default: Room } = await import('./Room.js');
         const room = await Room.findByPk(reservation.habitacion_id);
         if (!room) {
@@ -82,7 +94,28 @@ Reservation.init(
         const diffMs = fin.getTime() - inicio.getTime();
         const noches = Math.ceil(diffMs / 86400000);
 
-        reservation.precio_total = (noches * parseFloat(room.precio_noche)).toFixed(2);
+        let subtotalHabitacion = noches * parseFloat(room.precio_noche);
+        let totalPaquete = 0;
+
+        if (reservation.paquete_id) {
+          const { default: Paquete } = await import('./Paquete.js');
+          const { default: Servicio } = await import('./Servicio.js');
+          const paquete = await Paquete.findByPk(reservation.paquete_id, {
+            include: [{ model: Servicio, as: 'servicios' }],
+          });
+          if (paquete && paquete.servicios) {
+            let subtotalPaquete = 0;
+            for (let i = 0; i < paquete.servicios.length; i++) {
+              const serv = paquete.servicios[i];
+              const cantidad = serv.PaqueteServicio?.cantidad || 1;
+              subtotalPaquete += parseFloat(serv.precio) * cantidad;
+            }
+            const desc = parseFloat(paquete.descuento_porcentaje) || 0;
+            totalPaquete = subtotalPaquete * (1 - desc / 100);
+          }
+        }
+
+        reservation.precio_total = (subtotalHabitacion + totalPaquete).toFixed(2);
       },
     },
   }

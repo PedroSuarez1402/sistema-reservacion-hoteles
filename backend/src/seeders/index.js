@@ -3,10 +3,15 @@ import User from '../models/User.js';
 import Room from '../models/Room.js';
 import Reservation from '../models/Reservation.js';
 import Tag from '../models/Tag.js';
+import Servicio from '../models/Servicio.js';
+import Paquete from '../models/Paquete.js';
+import PaqueteServicio from '../models/PaqueteServicio.js';
 import usersData from './data/users.js';
 import roomsData from './data/rooms.js';
 import reservationsData from './data/reservations.js';
 import etiquetasData from './data/tags.js';
+import serviciosData from './data/servicios.js';
+import paquetesData from './data/paquetes.js';
 
 const tagsPorTipo = {
   SENCILLA: [
@@ -57,7 +62,7 @@ async function runSeeder() {
     console.log('✅ Conexión establecida correctamente.\n');
 
     const options = { cascade: true, force: true };
-    console.log('🗑️  Eliminando tablas en orden: Reservas → HabitacionesEtiquetas → Habitaciones → Usuarios → Etiquetas');
+    console.log('🗑️  Eliminando tablas en orden: Reservas → PaqueteServicios → Paquetes → Servicios → HabitacionesEtiquetas → Habitaciones → Usuarios → Etiquetas');
     await Reservation.destroy({ where: {}, truncate: options });
     try {
       const { HabitacionEtiqueta } = await import('../models/index.js');
@@ -65,6 +70,9 @@ async function runSeeder() {
     } catch (_) {
       // ignore
     }
+    await PaqueteServicio.destroy({ where: {}, truncate: options });
+    await Paquete.destroy({ where: {}, truncate: options });
+    await Servicio.destroy({ where: {}, truncate: options });
     await Room.destroy({ where: {}, truncate: options });
     await Tag.destroy({ where: {}, truncate: options });
     await User.destroy({ where: {}, truncate: options });
@@ -92,6 +100,35 @@ async function runSeeder() {
     }
     console.log(`✅ ${createdTags.size} etiquetas insertadas.\n`);
 
+    console.log('🛎️  Insertando servicios adicionales...');
+    const createdServicios = [];
+    for (const servData of serviciosData) {
+      const servicio = await Servicio.create(servData);
+      createdServicios.push(servicio);
+      console.log(`   + [servicio] ${servicio.nombre} ($${servicio.precio})`);
+    }
+    console.log(`✅ ${createdServicios.length} servicios insertados.\n`);
+
+    console.log('📦 Insertando paquetes turísticos y asociando servicios...');
+    const createdPaquetes = [];
+    for (const paqData of paquetesData) {
+      const { servicios_incluidos, ...paqueteFields } = paqData;
+      const paquete = await Paquete.create(paqueteFields);
+      createdPaquetes.push(paquete);
+
+      if (Array.isArray(servicios_incluidos) && servicios_incluidos.length > 0) {
+        for (const item of servicios_incluidos) {
+          await PaqueteServicio.create({
+            paquete_id: paquete.id,
+            servicio_id: item.servicio_id,
+            cantidad: item.cantidad || 1,
+          });
+        }
+      }
+      console.log(`   + [paquete] ${paquete.nombre} (Descuento: ${paquete.descuento_porcentaje}%) · ${servicios_incluidos?.length || 0} servicios`);
+    }
+    console.log(`✅ ${createdPaquetes.length} paquetes insertados.\n`);
+
     console.log('🏨 Insertando habitaciones + asociando etiquetas por tipo...');
     const createdRooms = [];
     for (const roomData of roomsData) {
@@ -113,14 +150,20 @@ async function runSeeder() {
 
     console.log('📅 Insertando reservaciones...');
     const createdReservations = [];
-    for (const resData of reservationsData) {
+    for (let i = 0; i < reservationsData.length; i++) {
+      const resData = { ...reservationsData[i] };
+      // Opcional: asociar un paquete a la primera reservación de prueba para ilustrar la integración
+      if (i === 0 && createdPaquetes.length > 0) {
+        resData.paquete_id = createdPaquetes[0].id;
+      }
       const reservation = await Reservation.create(resData);
       createdReservations.push(reservation);
       const usuario = createdUsers.find((u) => u.id === reservation.usuario_id);
       const habitacion = createdRooms.find((r) => r.id === reservation.habitacion_id);
       console.log(
         `   + Hab. ${habitacion.numero} | ${usuario.nombre} | ` +
-        `${reservation.fecha_inicio} → ${reservation.fecha_fin} | $${reservation.precio_total} [${reservation.estado}]`
+        `${reservation.fecha_inicio} → ${reservation.fecha_fin} | $${reservation.precio_total} [${reservation.estado}]` +
+        (reservation.paquete_id ? ` (Paquete: ${createdPaquetes[0].nombre})` : '')
       );
     }
     console.log(`✅ ${createdReservations.length} reservaciones insertadas.\n`);
@@ -136,6 +179,14 @@ async function runSeeder() {
     console.log('\n🏷️  Etiquetas preseedadas:');
     for (const t of createdTags.keys()) {
       console.log(`   · ${t}`);
+    }
+    console.log('\n🛎️  Servicios preseedados:');
+    for (const s of createdServicios) {
+      console.log(`   · ${s.nombre} ($${s.precio})`);
+    }
+    console.log('\n📦 Paquetes preseedados:');
+    for (const p of createdPaquetes) {
+      console.log(`   · ${p.nombre} (-${p.descuento_porcentaje}%)`);
     }
 
     await sequelize.close();

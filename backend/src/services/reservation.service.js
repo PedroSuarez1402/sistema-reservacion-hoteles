@@ -1,19 +1,20 @@
 import ReservationRepository from '../repositories/reservation.repository.js';
 import RoomRepository from '../repositories/room.repository.js';
+import { Paquete, Servicio } from '../models/index.js';
 import {
-  BadRequestError,
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-  UnprocessableEntityError,
-  assertRequired,
+    BadRequestError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    UnprocessableEntityError,
+    assertRequired,
 } from '../utils/errors.util.js';
 
 // Servicio lógica negocio Reservaciones
 class ReservationService {
     // Crea nueva reservación validando disponibilidad
     static async createReservation(data) {
-        const { usuario_id, habitacion_id, fecha_inicio, fecha_fin, estado } = data;
+        const { usuario_id, habitacion_id, paquete_id, fecha_inicio, fecha_fin, estado } = data;
 
         assertRequired(usuario_id, 'El usuario es requerido');
         assertRequired(habitacion_id, 'La habitación es requerida');
@@ -53,11 +54,47 @@ class ReservationService {
 
         const diferenciaMilisegundos = fin.getTime() - inicio.getTime();
         const diasReserva = Math.max(1, Math.ceil(diferenciaMilisegundos / (1000 * 60 * 60 * 24)));
-        const precio_total = (diasReserva * parseFloat(habitacion.precio_noche)).toFixed(2);
+        const subtotalHabitacion = diasReserva * parseFloat(habitacion.precio_noche);
+        // Esta seccion es el consumo del paquete sin utilizar farmaton
+        // Si viene paquete_id, buscar el paquete y sus servicios asociados en la base de datos
+        let totalPaquete = 0;
+        if (paquete_id) {
+            const paquete = await Paquete.findByPk(paquete_id, {
+                include: [
+                    {
+                        model: Servicio,
+                        as: 'servicios',
+                        through: { attributes: ['cantidad'] },
+                    },
+                ],
+            });
+
+            if (!paquete) {
+                throw new NotFoundError('El paquete seleccionado no existe');
+            }
+
+            // Calcular el subtotal del paquete sumando los precios de sus servicios mediante un bucle for
+            let subtotalPaquete = 0;
+            if (paquete.servicios && paquete.servicios.length > 0) {
+                for (let i = 0; i < paquete.servicios.length; i++) {
+                    const servicio = paquete.servicios[i];
+                    const cantidad = servicio.PaqueteServicio?.cantidad || 1;
+                    subtotalPaquete += parseFloat(servicio.precio) * cantidad;
+                }
+            }
+
+            // Aplicar el descuento: totalPaquete = subtotalPaquete * (1 - descuento_porcentaje / 100)
+            const descuentoPorcentaje = parseFloat(paquete.descuento_porcentaje) || 0;
+            totalPaquete = subtotalPaquete * (1 - descuentoPorcentaje / 100);
+        }
+
+        // Sumar totalPaquete al precio de las noches de habitación para calcular el precio_total final
+        const precio_total = (subtotalHabitacion + totalPaquete).toFixed(2);
 
         const nuevaReserva = await ReservationRepository.create({
             usuario_id,
             habitacion_id,
+            paquete_id: paquete_id || null,
             fecha_inicio,
             fecha_fin,
             precio_total,

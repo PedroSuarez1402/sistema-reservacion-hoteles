@@ -4,6 +4,8 @@ import userRoutes from './user.routes.js';
 import roomRoutes from './room.routes.js';
 import reservationRoutes from './reservation.routes.js';
 import tagRoutes from './tag.routes.js';
+import paqueteRoutes from './paquete.routes.js';
+import servicioRoutes from './servicio.routes.js';
 
 const router = Router();
 
@@ -25,5 +27,7 @@ router.use('/users', userRoutes);
 router.use('/rooms', roomRoutes);
 router.use('/reservations', reservationRoutes);
 router.use('/tags', tagRoutes);
+router.use('/paquetes', paqueteRoutes);
+router.use('/servicios', servicioRoutes);
 
 export default router;
