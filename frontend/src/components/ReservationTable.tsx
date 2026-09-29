@@ -153,6 +153,11 @@ function ReservationTable({
                               ? roomTypeLabels[r.habitacion.tipo]
                               : r.habitacion?.tipo ?? ''}
                           </span>
+                          {r.paquete ? (
+                            <span className="mt-1 w-fit inline-flex items-center gap-1 rounded bg-purple-50 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 border border-purple-200">
+                              🎁 {r.paquete.nombre}
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                     ) : null}

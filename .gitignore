@@ -64,6 +64,22 @@ frontend/yarn-error.log*
 frontend/pnpm-debug.log*
 frontend/.vercel
 
+# FRONTEND MONOLITO (Next.js - Puerto 3001)
+frontend-monolito/node_modules/
+frontend-monolito/.env
+frontend-monolito/.env.*
+!frontend-monolito/.env.example
+frontend-monolito/.next/
+frontend-monolito/out/
+frontend-monolito/build/
+frontend-monolito/next-env.d.ts
+frontend-monolito/.turbo/
+frontend-monolito/npm-debug.log*
+frontend-monolito/yarn-debug.log*
+frontend-monolito/yarn-error.log*
+frontend-monolito/pnpm-debug.log*
+frontend-monolito/.vercel
+
 # ============================================================
 # GENERALES / OS / EDITORES
 # ============================================================

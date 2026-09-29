@@ -21,6 +21,7 @@ export class ReservationBuilder {
     // Estado interno encapsulado (campos privados)
     #usuarioId = null;
     #habitacionId = null;
+    #paqueteId = null;
     #fechaInicio = null;
     #fechaFin = null;
     #noches = 0;
@@ -30,6 +31,7 @@ export class ReservationBuilder {
     #precioTotal = null;
     #estado = null;
     #notas = '';
+    #cotizacion = null;
 
     /**
    * Asocia el ID del huésped/usuario titular.
@@ -44,6 +46,32 @@ export class ReservationBuilder {
    */
     paraHabitacion(habitacion_id) {
         this.#habitacionId = habitacion_id;
+        return this;
+    }
+
+    /**
+   * Asocia el ID del paquete turístico seleccionado (opcional).
+   */
+    conPaquete(paquete_id) {
+        this.#paqueteId = paquete_id ? String(paquete_id).trim() : null;
+        return this;
+    }
+
+    /**
+   * Asocia una estructura del Patrón Composite (CotizacionReserva) para calcular y desglosar el precio total.
+   * @param {import('../composite/CotizacionReserva.js').CotizacionReserva} cotizacion
+   */
+    conCotizacion(cotizacion) {
+        if (cotizacion && typeof cotizacion.calcularPrecio === 'function') {
+            this.#cotizacion = cotizacion;
+            this.#precioTotal = cotizacion.calcularPrecio();
+            if (typeof cotizacion.calcularSubtotal === 'function') {
+                this.#subtotal = cotizacion.calcularSubtotal();
+            }
+            if (typeof cotizacion.calcularImpuestos === 'function') {
+                this.#impuestos = cotizacion.calcularImpuestos();
+            }
+        }
         return this;
     }
 
@@ -141,6 +169,7 @@ export class ReservationBuilder {
         return {
             usuario_id:    this.#usuarioId,
             habitacion_id: this.#habitacionId,
+            paquete_id:    this.#paqueteId,
             fecha_inicio:  isoDate(this.#fechaInicio),
             fecha_fin:     isoDate(this.#fechaFin),
             precio_total:  +Number(this.#precioTotal).toFixed(2),
@@ -154,6 +183,7 @@ export class ReservationBuilder {
     get subtotal() { return this.#subtotal; }
     get impuestos() { return this.#impuestos; }
     get precioTotal() { return this.#precioTotal; }
+    get cotizacion() { return this.#cotizacion; }
 }
 
 export default ReservationBuilder;

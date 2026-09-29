@@ -34,6 +34,14 @@ Reservation.init(
       type: DataTypes.UUID,
       allowNull: false,
     },
+    paquete_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'paquetes',
+        key: 'id',
+      },
+    },
     fecha_inicio: {
       type: DataTypes.DATEONLY,
       allowNull: false,

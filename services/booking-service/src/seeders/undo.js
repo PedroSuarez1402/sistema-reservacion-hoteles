@@ -1,13 +1,15 @@
 import sequelize from '../config/database.js';
 import User from '../models/User.js';
 import Reservation from '../models/Reservation.js';
+import Paquete from '../models/Paquete.js';
+import Servicio from '../models/Servicio.js';
+import PaqueteServicio from '../models/PaqueteServicio.js';
 
-// Limpia datos BD del booking-service (usuarios y reservaciones)
-// NOTA: Room, Tags y HabitacionEtiquetas NO se manejan aquí, pertenecen a room-service.
+// Limpia datos BD del booking-service (usuarios, reservaciones, paquetes, servicios)
 async function runUndo() {
   try {
     console.log('========================================');
-    console.log('🧹 [BOOKING] Limpiando datos (usuarios + reservaciones)');
+    console.log('🧹 [BOOKING] Limpiando datos (usuarios, reservaciones, paquetes, servicios)');
     console.log('========================================\n');
 
     await sequelize.authenticate();
@@ -17,6 +19,15 @@ async function runUndo() {
     console.log('🗑️  Eliminando reservaciones...');
     const r1 = await Reservation.destroy({ where: {}, truncate: options });
     console.log(`   → ${r1} registros eliminados.`);
+
+    console.log('🗑️  Eliminando paquete_servicios...');
+    await PaqueteServicio.destroy({ where: {}, truncate: options });
+
+    console.log('🗑️  Eliminando paquetes...');
+    await Paquete.destroy({ where: {}, truncate: options });
+
+    console.log('🗑️  Eliminando servicios...');
+    await Servicio.destroy({ where: {}, truncate: options });
 
     console.log('🗑️  Eliminando usuarios...');
     const r3 = await User.destroy({ where: {}, truncate: options });

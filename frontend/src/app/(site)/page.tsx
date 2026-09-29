@@ -9,6 +9,7 @@ import {
   Sparkles,
   CheckCircle2,
   Hotel,
+  Gift,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,6 +37,7 @@ import {
 import {
   useAvailableRooms,
   useCreateReservation,
+  usePackages,
   useRooms,
 } from '@/hooks';
 import useAuth from '@/hooks/useAuth';
@@ -59,6 +61,8 @@ function HomePage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   const createReservation = useCreateReservation();
+  const { data: paquetes = [], isLoading: paquetesLoading } = usePackages();
+  const [selectedPackageId, setSelectedPackageId] = React.useState<string | null>(null);
   const [selectedRoom, setSelectedRoom] = React.useState<Room | null>(null);
   const [bookingDialogOpen, setBookingDialogOpen] = React.useState(false);
   const [detailRoom, setDetailRoom] = React.useState<Room | null>(null);
@@ -72,7 +76,10 @@ function HomePage() {
   const [bookingFechasError, setBookingFechasError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!bookingDialogOpen) return;
+    if (!bookingDialogOpen) {
+      setSelectedPackageId(null);
+      return;
+    }
     // Fresh sync on open: prefer current watch values over stale paramsForQuery.
     setBookingFechas({
       fecha_inicio: watchFechaInicio || todayIso,
@@ -180,6 +187,27 @@ function HomePage() {
     });
   }
 
+  const selectedPackage = React.useMemo(() => {
+    if (!selectedPackageId) return null;
+    return paquetes.find((p) => p.id === selectedPackageId) || null;
+  }, [selectedPackageId, paquetes]);
+
+  const packagePriceCalc = React.useMemo(() => {
+    if (!selectedPackage || !selectedPackage.servicios) return { subtotal: 0, total: 0, descuento: 0 };
+    let subtotal = 0;
+    for (const s of selectedPackage.servicios) {
+      const qty = s.PaqueteServicio?.cantidad || 1;
+      subtotal += Number(s.precio) * qty;
+    }
+    const desc = Number(selectedPackage.descuento_porcentaje) || 0;
+    const total = subtotal * (1 - desc / 100);
+    return { subtotal, total, descuento: desc };
+  }, [selectedPackage]);
+
+  const bookingNights = calculateNights(bookingFechas.fecha_inicio, bookingFechas.fecha_fin);
+  const roomSubtotal = selectedRoom ? bookingNights * Number(selectedRoom.precio_noche) : 0;
+  const bookingTotalEstimate = roomSubtotal + packagePriceCalc.total;
+
   async function confirmBooking() {
     if (!selectedRoom) return;
     const payload = bookingFechas;
@@ -194,16 +222,20 @@ function HomePage() {
         habitacion_id: selectedRoom.id,
         fecha_inicio: payload.fecha_inicio,
         fecha_fin: payload.fecha_fin,
+        paquete_id: selectedPackageId || null,
         precio_total: Number(bookingTotalEstimate.toFixed(2)),
       });
       toast.success(
         '¡Reserva exitosa!',
         `Habitación ${selectedRoom.numero} reservada del ${formatDate(
           payload.fecha_inicio
-        )} al ${formatDate(payload.fecha_fin)}`
+        )} al ${formatDate(payload.fecha_fin)}${
+          selectedPackage ? ` con ${selectedPackage.nombre}` : ''
+        }`
       );
       setBookingDialogOpen(false);
       setSelectedRoom(null);
+      setSelectedPackageId(null);
       router.push('/dashboard/mis-reservas');
     } catch (err) {
       const message =
@@ -213,10 +245,6 @@ function HomePage() {
       toast.error('Error al reservar', message);
     }
   }
-
-  const bookingNights = calculateNights(bookingFechas.fecha_inicio, bookingFechas.fecha_fin);
-  const bookingTotalEstimate =
-    selectedRoom ? bookingNights * Number(selectedRoom.precio_noche) : 0;
 
   return (
     <div className="flex flex-col gap-16">
@@ -447,8 +475,8 @@ function HomePage() {
         open={bookingDialogOpen}
         onClose={() => setBookingDialogOpen(false)}
         title="Confirmar reserva"
-        description="Ajusta las fechas de tu estancia y revisa el importe antes de confirmar."
-        size="md"
+        description="Ajusta las fechas de tu estancia, añade paquetes turísticos y revisa el importe."
+        size="lg"
         footer={
           <>
             <Button
@@ -521,8 +549,138 @@ function HomePage() {
                   <span>{bookingFechasError}</span>
                 </div>
               ) : null}
+            </div>
 
-              <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-sm">
+            {/* Selector de Paquetes Turísticos */}
+            <div className="space-y-3 rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-purple-600" />
+                  <span className="font-semibold text-slate-900 text-sm">
+                    Añade un Paquete Turístico (Opcional)
+                  </span>
+                </div>
+                {selectedPackage ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPackageId(null)}
+                    className="text-xs text-purple-600 hover:text-purple-800 underline font-medium"
+                  >
+                    Quitar paquete
+                  </button>
+                ) : null}
+              </div>
+
+              {paquetesLoading ? (
+                <p className="text-xs text-slate-400 py-2">Cargando paquetes disponibles...</p>
+              ) : paquetes.length === 0 ? (
+                <p className="text-xs text-slate-400 py-2">No hay paquetes turísticos disponibles en este momento.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  {/* Opción: Sin paquete */}
+                  <div
+                    onClick={() => setSelectedPackageId(null)}
+                    className={`cursor-pointer rounded-lg border p-3 transition-all ${
+                      selectedPackageId === null
+                        ? 'border-primary-600 bg-primary-50/50 ring-1 ring-primary-600'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Solo Habitación</p>
+                        <p className="text-xs text-slate-500 mt-0.5">Estadía estándar sin servicios adicionales</p>
+                      </div>
+                      {selectedPackageId === null && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-white text-xs">
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs font-medium text-slate-600">$0.00 adicional</p>
+                  </div>
+
+                  {/* Paquetes desde la Base de Datos */}
+                  {paquetes.map((pkg) => {
+                    const isSelected = selectedPackageId === pkg.id;
+                    let pkgSubtotal = 0;
+                    if (pkg.servicios) {
+                      for (const s of pkg.servicios) {
+                        const qty = s.PaqueteServicio?.cantidad || 1;
+                        pkgSubtotal += Number(s.precio) * qty;
+                      }
+                    }
+                    const desc = Number(pkg.descuento_porcentaje) || 0;
+                    const pkgTotal = pkgSubtotal * (1 - desc / 100);
+
+                    return (
+                      <div
+                        key={pkg.id}
+                        onClick={() => setSelectedPackageId(pkg.id)}
+                        className={`cursor-pointer rounded-lg border p-3 transition-all ${
+                          isSelected
+                            ? 'border-purple-600 bg-purple-50/50 ring-1 ring-purple-600'
+                            : 'border-slate-200 bg-white hover:border-purple-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-sm font-semibold text-slate-900">{pkg.nombre}</p>
+                              {desc > 0 && (
+                                <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0 border-0">
+                                  -{desc}% dto
+                                </Badge>
+                              )}
+                            </div>
+                            {pkg.descripcion && (
+                              <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                                {pkg.descripcion}
+                              </p>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-600 text-white text-xs">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+
+                        {pkg.servicios && pkg.servicios.length > 0 && (
+                          <div className="mt-2 space-y-0.5 border-t border-slate-100 pt-1.5">
+                            {pkg.servicios.map((s) => (
+                              <div key={s.id} className="flex justify-between text-[11px] text-slate-600">
+                                <span className="truncate">
+                                  • {s.PaqueteServicio?.cantidad || 1}x {s.nombre}
+                                </span>
+                                <span className="text-slate-400 shrink-0 ml-1">
+                                  ${Number(s.precio).toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="mt-2.5 flex items-baseline justify-between border-t border-slate-100 pt-1.5">
+                          {desc > 0 ? (
+                            <span className="text-[11px] text-slate-400 line-through">
+                              ${pkgSubtotal.toFixed(2)}
+                            </span>
+                          ) : <span />}
+                          <span className="text-xs font-bold text-purple-700">
+                            +{formatCurrency(pkgTotal)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Desglose y Total */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-xs uppercase tracking-wider text-slate-500">Llegada</p>
                   <p className="mt-1 font-medium text-slate-900">
@@ -539,13 +697,37 @@ function HomePage() {
                   <p className="text-xs uppercase tracking-wider text-slate-500">Noches</p>
                   <p className="mt-1 font-medium text-slate-900">
                     {bookingFechas.fecha_inicio && bookingFechas.fecha_fin
-                      ? bookingNights
+                      ? `${bookingNights} noche${bookingNights === 1 ? '' : 's'}`
                       : '—'}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs uppercase tracking-wider text-slate-500">Total estimado</p>
-                  <p className="mt-1 text-lg font-bold text-primary-700">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Subtotal Habitación</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {selectedRoom && bookingNights > 0
+                      ? formatCurrency(roomSubtotal)
+                      : '—'}
+                  </p>
+                </div>
+                {selectedPackage ? (
+                  <>
+                    <div className="col-span-1">
+                      <p className="text-xs uppercase tracking-wider text-purple-600 font-medium">Paquete seleccionado</p>
+                      <p className="mt-1 font-medium text-purple-900 truncate">
+                        🎁 {selectedPackage.nombre}
+                      </p>
+                    </div>
+                    <div className="col-span-1 text-right">
+                      <p className="text-xs uppercase tracking-wider text-purple-600 font-medium">Costo Paquete</p>
+                      <p className="mt-1 font-semibold text-purple-700">
+                        +{formatCurrency(packagePriceCalc.total)}
+                      </p>
+                    </div>
+                  </>
+                ) : null}
+                <div className="col-span-2 border-t border-slate-200 pt-3 flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-wider text-slate-700 font-semibold">Total estimado final</p>
+                  <p className="text-xl font-bold text-primary-700">
                     {bookingFechas.fecha_inicio && bookingFechas.fecha_fin
                       ? formatCurrency(bookingTotalEstimate)
                       : '—'}

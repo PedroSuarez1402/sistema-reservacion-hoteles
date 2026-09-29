@@ -59,10 +59,33 @@ export interface Room {
   updatedAt?: string;
 }
 
+export interface Servicio {
+  id: string;
+  nombre: string;
+  precio: number | string;
+  descripcion?: string | null;
+  estado: 'ACTIVO' | 'INACTIVO';
+  PaqueteServicio?: {
+    cantidad: number;
+  };
+}
+
+export interface Paquete {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  descuento_porcentaje: number | string;
+  estado: 'ACTIVO' | 'INACTIVO';
+  servicios?: Servicio[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Reservation {
   id: string;
   usuario_id: string;
   habitacion_id: string;
+  paquete_id?: string | null;
   fecha_inicio: string;
   fecha_fin: string;
   precio_total: number;
@@ -71,6 +94,7 @@ export interface Reservation {
   updatedAt?: string;
   habitacion?: Room;
   usuario?: User;
+  paquete?: Paquete;
 }
 
 export interface LoginCredentials {
@@ -141,6 +165,8 @@ export interface CreateReservationPayload {
   habitacion_id: string;
   fecha_inicio: string;
   fecha_fin: string;
+  paquete_id?: string | null;
+  precio_total?: number;
 }
 
 export interface UpdateRoomPayload {

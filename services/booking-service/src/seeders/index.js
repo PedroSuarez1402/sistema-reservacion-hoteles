@@ -1,23 +1,56 @@
 import sequelize from '../config/database.js';
 import User from '../models/User.js';
 import Reservation from '../models/Reservation.js';
+import Paquete from '../models/Paquete.js';
+import Servicio from '../models/Servicio.js';
+import PaqueteServicio from '../models/PaqueteServicio.js';
 import usersData from './data/users.js';
 import reservationsData from './data/reservations.js';
+import serviciosData from './data/servicios.js';
+import paquetesData from './data/paquetes.js';
 
-// Seeder BOOKING-SERVICE (solo User + Reservation)
+// Seeder BOOKING-SERVICE (Users + Reservations + Servicios + Paquetes)
 async function runSeeder() {
   try {
     console.log('========================================');
-    console.log('🌱 Seeding BOOKING SERVICE (Users + Reservations)');
+    console.log('🌱 Seeding BOOKING SERVICE (Users + Reservations + Paquetes + Servicios)');
     console.log('========================================\n');
 
     await sequelize.authenticate();
     console.log('✅ Conexión MySQL establecida.\n');
 
-    console.log('🗑️  Truncando reservaciones → usuarios');
+    console.log('🗑️  Truncando reservaciones → paquete_servicios → paquetes → servicios → usuarios');
     await Reservation.destroy({ where: {} });
+    await PaqueteServicio.destroy({ where: {} });
+    await Paquete.destroy({ where: {} });
+    await Servicio.destroy({ where: {} });
     await User.destroy({ where: {} });
     console.log('✅ Tablas limpias.\n');
+
+    console.log('💆 Insertando servicios adicionales...');
+    for (const servData of serviciosData) {
+      await Servicio.create(servData);
+      console.log(`   + ${servData.nombre} ($${servData.precio})`);
+    }
+    console.log(`✅ ${serviciosData.length} servicios adicionales insertados.\n`);
+
+    console.log('🎁 Insertando paquetes turísticos...');
+    for (const pkgData of paquetesData) {
+      const { servicios_incluidos, ...datosPaquete } = pkgData;
+      const paquete = await Paquete.create(datosPaquete);
+      console.log(`   + [${paquete.nombre}] (${paquete.descuento_porcentaje}% descuento)`);
+
+      if (servicios_incluidos && servicios_incluidos.length > 0) {
+        for (const item of servicios_incluidos) {
+          await PaqueteServicio.create({
+            paquete_id: paquete.id,
+            servicio_id: item.servicio_id,
+            cantidad: item.cantidad,
+          });
+        }
+      }
+    }
+    console.log(`✅ ${paquetesData.length} paquetes turísticos creados con sus servicios asociados.\n`);
 
     console.log('👤 Insertando usuarios (3 roles)...');
     const createdUsers = [];

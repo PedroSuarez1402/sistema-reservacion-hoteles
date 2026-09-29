@@ -73,3 +73,4 @@ export type {
   UseUpdateUserOptions,
   UseDeleteUserOptions,
 } from './query/useUsers';
+export { usePackages, usePackage } from './query/usePackages';

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import sequelize from '../config/database.js';
 import reservationRoutes from './reservation.routes.js';
 import userRoutes from './user.routes.js';
+import paqueteRoutes from './paquete.routes.js';
 
 const router = Router();
 
@@ -20,8 +21,9 @@ router.get('/health', async (req, res, next) => {
   }
 });
 
-// ROUTES - Booking Service solo expone: reservaciones + usuarios (incl. auth)
+// ROUTES - Booking Service expone: reservaciones + usuarios (incl. auth) + paquetes
 router.use('/reservations', reservationRoutes);
 router.use('/users', userRoutes);
+router.use('/paquetes', paqueteRoutes);
 
 export default router;

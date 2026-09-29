@@ -1,22 +1,39 @@
-# 🏨 Sistema de Reservación de Hoteles
+# 🏨 Sistema de Reservación de Hoteles (Patrones de Software)
 
-Aplicación web moderna de gestión hotelera construida bajo una **arquitectura de microservicios** que permite administrar **habitaciones**, **usuarios** y **reservaciones** con disponibilidad en tiempo real, roles de acceso y autenticación segura.
+Aplicación web integral de gestión hotelera y reservaciones turísticas desarrollada para la asignatura de **Patrones de Software**. Cuenta con dos arquitecturas comparativas: una **línea base monolítica procedimental (sin patrones)** y una **arquitectura refactorizada basada en microservicios y patrones de diseño (Factory Method, Builder, Composite y Pub/Sub Broker)**.
 
-## Arquitectura general
+---
 
+## 🏛️ Comparativa de Arquitecturas
+
+### 1️⃣ Versión con Patrones (Microservicios + Next.js)
 ```
 sistema-reservacion-hoteles/
-├── frontend/                 # 🎨 Next.js 14 + React + TS + Tailwind (puerto 3000)
+├── frontend/                 # 🎨 Next.js 14 + React + TS (Puerto 3000)
 └── services/
-    ├── room-service/         # 🏨 Microservicio Catálogo: Habitaciones, Etiquetas, Imágenes (puerto 4001)
-    └── booking-service/      # 📅 Microservicio Reservas: Usuarios, Autenticación, Reservaciones (puerto 4002)
+    ├── room-service/         # 🏨 Catálogo (Habitaciones, Tags, Fotos) [Factory Method] (Puerto 4001)
+    ├── booking-service/      # 📅 Reservas (Usuarios, Auth, Paquetes) [Builder + Composite] (Puerto 4002)
+    └── message-broker/       # 📨 Broker central asíncrono [Pub/Sub] (Puerto 4003)
 ```
 
-- **Frontend**: Next.js 14 + React 18 + TypeScript + Tailwind CSS
-- **Microservicios**: Node.js 22 + Express + ES Modules (cada uno independiente)
-- **Base de datos**: MySQL 8 + Sequelize (ORM) — ambos servicios comparten la misma instancia de BD pero administran sus propias tablas
-- **Autenticación**: JWT + contraseñas hasheadas con bcrypt (gestionado en `booking-service`)
-- **Comunicación entre servicios**: `booking-service` consulta disponibilidad/precios a `room-service` vía HTTP interno
+**Patrones implementados en Microservicios:**
+* **Factory Method** (`room-service`): Familia de creadores concretos (`CreadorSencilla`, `CreadorDoble`, `CreadorSuite`) para instanciar tipos de habitaciones.
+* **Builder** (`booking-service`): Construcción y validación paso a paso de reservaciones complejas (`ReservationBuilder`).
+* **Composite** (`booking-service`): Jerarquía polimórfica para tarificación y cotización de estadías, servicios individuales y paquetes compuestos (`ComponenteCotizacion`, `HospedajeItem`, `ServicioSimple`, `PaqueteCompuesto`, `CotizacionReserva`).
+* **Publish / Subscribe** (`message-broker`): Bus de eventos desacoplado para notificar `RESERVA_CREADA`.
+* **API Gateway / Proxy** (`frontend`): Rewrites transparentes en Next.js.
+
+---
+
+### 2️⃣ Versión Línea Base Sin Patrones (Monolito)
+```
+sistema-reservacion-hoteles/
+├── frontend-monolito/        # 🎨 Next.js 14 conectado al monolito (Puerto 3001)
+└── backend/                  # 🏛️ Backend Monolítico Express (Puerto 4000 /api/v1)
+```
+* **Cálculo procedimental**: Utiliza bucles `for` e `if/else` manuales para acumular precios de servicios y paquetes sin abstracciones.
+
+---
 
 ---
 

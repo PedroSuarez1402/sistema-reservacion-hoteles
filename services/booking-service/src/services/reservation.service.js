@@ -4,6 +4,7 @@
  */
 
 import ReservationRepository from '../repositories/reservation.repository.js';
+import { Paquete, Servicio } from '../models/index.js';
 import {
   BadRequestError,
   ConflictError,
@@ -15,6 +16,12 @@ import {
 } from '../utils/errors.util.js';
 import { getRoomById, RoomNotFoundError, RoomServiceUnavailableError } from '../clients/room-client.js';
 import ReservationBuilder from '../builders/reservation.builder.js';
+import {
+  CotizacionReserva,
+  HospedajeItem,
+  PaqueteCompuesto,
+  ServicioSimple,
+} from '../composite/index.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -99,7 +106,7 @@ class ReservationService {
    * ReservationService actúa como DIRECTOR orquestando los pasos de ensamblado.
    */
     static async createReservation(data) {
-        const { usuario_id, habitacion_id, fecha_inicio, fecha_fin, estado, precio_total, notas } = data;
+        const { usuario_id, habitacion_id, paquete_id, fecha_inicio, fecha_fin, estado, precio_total, notas } = data;
 
         assertRequired(usuario_id, 'El usuario es requerido');
         assertRequired(habitacion_id, 'La habitación es requerida');
@@ -137,18 +144,80 @@ class ReservationService {
 
         const diferenciaMilisegundos = fin.getTime() - inicio.getTime();
         const diasReserva = Math.max(1, Math.round(diferenciaMilisegundos / (1000 * 60 * 60 * 24)));
-        const precioGuardar = await calcularPrecioTotal({
-            precioTotalInput: precio_total,
-            habitacionId: hid,
-            diasReserva,
-        });
 
-        // ---- Uso de ReservationBuilder (Director construye paso a paso) ----
+        // =====================================================================
+        // Construcción de la Cotización mediante el PATRÓN COMPOSITE
+        // =====================================================================
+        const cotizacion = new CotizacionReserva();
+
+        // 1. Componente Hoja (Leaf): Estancia de Hospedaje
+        const precioNocheHabitacion = await resolvePrecioNoche(hid, { silentIfMissing: true });
+        const itemHospedaje = new HospedajeItem({
+            habitacionId: hid,
+            noches: diasReserva,
+            precioNoche: precioNocheHabitacion || 0,
+        });
+        cotizacion.agregar(itemHospedaje);
+
+        // 2. Componente Compuesto (Composite): Paquete Turístico (si aplica)
+        if (paquete_id) {
+            const paqueteDB = await Paquete.findByPk(paquete_id, {
+                include: [
+                    {
+                        model: Servicio,
+                        as: 'servicios',
+                        through: { attributes: ['cantidad'] },
+                    },
+                ],
+            });
+
+            if (!paqueteDB) {
+                throw new NotFoundError('El paquete turístico seleccionado no existe');
+            }
+
+            // Instancia el Composite y le agrega sus Leaf (ServicioSimple)
+            const paqueteComposite = new PaqueteCompuesto({
+                paqueteId: paqueteDB.id,
+                nombre: paqueteDB.nombre,
+                descuentoPorcentaje: Number(paqueteDB.descuento_porcentaje) || 0,
+                descripcion: paqueteDB.descripcion,
+            });
+
+            if (paqueteDB.servicios && Array.isArray(paqueteDB.servicios)) {
+                for (const serv of paqueteDB.servicios) {
+                    const cant = serv.PaqueteServicio?.cantidad || 1;
+                    paqueteComposite.agregar(
+                        new ServicioSimple({
+                            servicioId: serv.id,
+                            nombre: serv.nombre,
+                            precioUnitario: Number(serv.precio),
+                            cantidad: cant,
+                            descripcion: serv.descripcion,
+                        })
+                    );
+                }
+            }
+
+            cotizacion.agregar(paqueteComposite);
+        }
+
+        // Calcula el precio total final de forma polimórfica y recursiva
+        const precioCalculadoComposite = cotizacion.calcularPrecio();
+
+        // Si el cliente envió un precio_total manual explícito y no hay discrepancia fatal, respetamos
+        let precioFinal = precioCalculadoComposite;
+        if (precio_total && Number(precio_total) > 0) {
+            precioFinal = Number(Number(precio_total).toFixed(2));
+        }
+
+        // ---- Uso de ReservationBuilder (Director construye paso a paso con el Composite) ----
         const builder = new ReservationBuilder()
             .conHuesped(usuario_id)
             .paraHabitacion(hid)
             .conFechas(fecha_inicio, fecha_fin)
-            .conTotalManual(precioGuardar)
+            .conPaquete(paquete_id || null)
+            .conCotizacion(cotizacion)
+            .conTotalManual(precioFinal)
             .conEstado(estado || 'CONFIRMADA');
         if (notas) builder.conNotas(notas);
 
