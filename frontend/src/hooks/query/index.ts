@@ -5,3 +5,4 @@ export * from './useReservations';
 export * from './useAuth';
 export * from './useTags';
 export * from './useUsers';
+export * from './useClientes';

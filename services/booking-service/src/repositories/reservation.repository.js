@@ -1,10 +1,17 @@
 import { Op } from 'sequelize';
-import Reservation from '../models/Reservation.js';
-import User from '../models/User.js';
-import Paquete from '../models/Paquete.js';
-import Servicio from '../models/Servicio.js';
+import {
+  Reservation,
+  User,
+  Cliente,
+  Acompanante,
+  Paquete,
+  Servicio,
+} from '../models/index.js';
 
 const USER_INCLUDE_ATTRS = ['id', 'nombre', 'email', 'rol'];
+const CLIENTE_INCLUDE_ATTRS = ['id', 'documento', 'nombre', 'email', 'telefono', 'direccion'];
+const ACOMPANANTE_INCLUDE_ATTRS = ['id', 'documento', 'nombre', 'parentesco', 'telefono'];
+
 const PAQUETE_INCLUDE = {
   model: Paquete,
   as: 'paquete',
@@ -17,6 +24,36 @@ const PAQUETE_INCLUDE = {
   ],
 };
 
+function buildIncludes({ includeUser = true, includeCliente = true, includeAcompanantes = true, includePaquete = true } = {}) {
+  const include = [];
+  if (includeCliente) {
+    include.push({
+      model: Cliente,
+      as: 'cliente',
+      attributes: CLIENTE_INCLUDE_ATTRS,
+    });
+  }
+  if (includeAcompanantes) {
+    include.push({
+      model: Acompanante,
+      as: 'acompanantes',
+      attributes: ACOMPANANTE_INCLUDE_ATTRS,
+    });
+  }
+  if (includeUser) {
+    include.push({
+      model: User,
+      as: 'usuario',
+      attributes: USER_INCLUDE_ATTRS,
+      required: false,
+    });
+  }
+  if (includePaquete) {
+    include.push(PAQUETE_INCLUDE);
+  }
+  return include;
+}
+
 // Repositorio acceso datos Reservaciones
 class ReservationRepository {
   // Crea nueva reservación en BD
@@ -24,46 +61,32 @@ class ReservationRepository {
     return await Reservation.create(data);
   }
 
-  // Obtiene lista reservaciones con includes usuario y paquete
+  // Obtiene lista reservaciones con includes cliente, acompanantes, usuario y paquete
   static async getAll(options = {}) {
     const {
       where = {},
       order = [['created_at', 'DESC']],
       includeUser = true,
+      includeCliente = true,
+      includeAcompanantes = true,
       includePaquete = true,
       limit,
       offset,
     } = options;
 
-    const include = [];
-    if (includeUser) {
-      include.push({
-        model: User,
-        as: 'usuario',
-        attributes: USER_INCLUDE_ATTRS,
-      });
-    }
-    if (includePaquete) {
-      include.push(PAQUETE_INCLUDE);
-    }
-
+    const include = buildIncludes({ includeUser, includeCliente, includeAcompanantes, includePaquete });
     return await Reservation.findAll({ where, order, include, limit, offset });
   }
 
   // Obtiene reservación por ID con includes opcionales
   static async getById(id, options = {}) {
-    const { includeUser = true, includePaquete = true } = options;
-    const include = [];
-    if (includeUser) {
-      include.push({
-        model: User,
-        as: 'usuario',
-        attributes: USER_INCLUDE_ATTRS,
-      });
-    }
-    if (includePaquete) {
-      include.push(PAQUETE_INCLUDE);
-    }
+    const {
+      includeUser = true,
+      includeCliente = true,
+      includeAcompanantes = true,
+      includePaquete = true,
+    } = options;
+    const include = buildIncludes({ includeUser, includeCliente, includeAcompanantes, includePaquete });
     return await Reservation.findByPk(id, { include });
   }
 
@@ -72,15 +95,23 @@ class ReservationRepository {
     return await this.getById(id, options);
   }
 
+  // Obtiene reservaciones de un cliente por ID
+  static async getByClienteId(cliente_id, options = {}) {
+    const { order = [['fecha_inicio', 'DESC']], includePaquete = true } = options;
+    const include = buildIncludes({ includeUser: false, includeCliente: true, includeAcompanantes: true, includePaquete });
+    return await Reservation.findAll({
+      where: { cliente_id },
+      order,
+      include,
+    });
+  }
+
   // Obtiene reservaciones de un usuario por ID
   static async getByUsuarioId(usuario_id, options = {}) {
     const { order = [['fecha_inicio', 'DESC']], includePaquete = true } = options;
-    const include = [];
-    if (includePaquete) {
-      include.push(PAQUETE_INCLUDE);
-    }
+    const include = buildIncludes({ includeUser: true, includeCliente: true, includeAcompanantes: true, includePaquete });
     return await Reservation.findAll({
-      where: { usuario_id },
+      where: { [Op.or]: [{ usuario_id }, { cliente_id: usuario_id }] },
       order,
       include,
     });
@@ -88,15 +119,8 @@ class ReservationRepository {
 
   // Obtiene reservaciones de una habitación por ID
   static async getByHabitacionId(habitacion_id, options = {}) {
-    const { order = [['fecha_inicio', 'DESC']], includeUser = true } = options;
-    const include = [];
-    if (includeUser) {
-      include.push({
-        model: User,
-        as: 'usuario',
-        attributes: USER_INCLUDE_ATTRS,
-      });
-    }
+    const { order = [['fecha_inicio', 'DESC']], includeCliente = true } = options;
+    const include = buildIncludes({ includeUser: true, includeCliente, includeAcompanantes: true, includePaquete: false });
     return await Reservation.findAll({
       where: { habitacion_id },
       order,

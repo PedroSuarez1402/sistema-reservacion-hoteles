@@ -9,6 +9,10 @@ import {
   UserPlus,
   Users,
   XCircle,
+  UserCheck,
+  Building,
+  User,
+  Plus,
 } from 'lucide-react';
 import {
   Badge,
@@ -20,53 +24,50 @@ import {
   Dialog,
   Input,
   Pagination,
-  rolFilterOptions,
   useToast,
 } from '@/components';
-import type { SelectOption } from '@/components/ui/Select';
-import { cn, formatCurrency, formatDate, roleLabels } from '@/lib/utils';
+import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import {
   useAuth,
-  useDeleteUser,
-  useUpdateUser,
-  useUsersPaginated,
+  useClientesPaginated,
+  useCreateCliente,
+  useUpdateCliente,
+  useDeleteCliente,
 } from '@/hooks';
-import type {
-  ApiErrorResponse,
-  ClientListItem,
-  UpdateUserPayload,
-  UserRole,
-} from '@/types';
+import type { Cliente, Acompanante } from '@/types';
 
-type ClienteRolFilter = UserRole | 'all';
+type ClienteFilterTab = 'all' | 'con_acompanantes' | 'con_reservas' | 'vip';
 
 function ClientSummary({
   clients,
   total,
 }: {
-  clients: ClientListItem[];
+  clients: Cliente[];
   total: number;
 }) {
   const today = new Date();
   const firstDayMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
   const nuevosMes = clients.filter(
     (c) => c.createdAt && new Date(c.createdAt) >= firstDayMonth
   ).length;
-  const sinReservas = clients.filter((c) => c.reservaciones_count === 0).length;
-  const ingresosSorted = [...clients]
-    .map((c) => Number(c.ingreso_total) || 0)
-    .sort((a, b) => b - a);
-  const p90Index = Math.max(0, Math.ceil(ingresosSorted.length * 0.1) - 1);
-  const p90Threshold = ingresosSorted[p90Index] ?? 0;
-  const vipCount = clients.filter(
-    (c) =>
-      c.reservaciones_count >= 3 &&
-      (Number(c.ingreso_total) || 0) >= Math.max(p90Threshold, 1)
+
+  const conAcompanantes = clients.filter(
+    (c) => (c.acompanantes?.length ?? 0) > 0
   ).length;
+
+  const vipCount = clients.filter((c) => {
+    const rCount = c.reservaciones_count ?? (c.reservaciones?.length ?? 0);
+    const gasto = (c.reservaciones ?? []).reduce(
+      (sum, r) => sum + (Number(r.precio_total) || 0),
+      0
+    );
+    return rCount >= 3 || gasto >= 500;
+  }).length;
 
   const cards = [
     {
-      label: 'Total clientes',
+      label: 'Clientes Registrados',
       value: total.toString(),
       icon: <Users className="h-5 w-5 text-primary-600" />,
       tone: 'bg-primary-50 ring-primary-100',
@@ -78,10 +79,10 @@ function ClientSummary({
       tone: 'bg-emerald-50 ring-emerald-100',
     },
     {
-      label: 'Sin reservas',
-      value: sinReservas.toString(),
-      icon: <XCircle className="h-5 w-5 text-amber-600" />,
-      tone: 'bg-amber-50 ring-amber-100',
+      label: 'Con Acompañantes',
+      value: conAcompanantes.toString(),
+      icon: <UserCheck className="h-5 w-5 text-blue-600" />,
+      tone: 'bg-blue-50 ring-blue-100',
     },
     {
       label: 'Clientes VIP',
@@ -96,16 +97,16 @@ function ClientSummary({
       {cards.map((card) => (
         <div
           key={card.label}
-          className={`rounded-2xl p-4 ring-1 ${card.tone}`}
+          className={`rounded-2xl p-4 ring-1 ${card.tone} shadow-2xs`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 {card.label}
               </p>
               <p className="text-2xl font-bold text-slate-900">{card.value}</p>
             </div>
-            <div className="rounded-xl bg-white/80 p-2 shadow-sm ring-1 ring-white">
+            <div className="rounded-xl bg-white/80 p-2 shadow-xs ring-1 ring-white">
               {card.icon}
             </div>
           </div>
@@ -115,68 +116,110 @@ function ClientSummary({
   );
 }
 
-function ClientesPage() {
+export default function ClientesPage() {
   const toast = useToast();
 
   const { user: me } = useAuth();
   const isAdmin = me?.rol === 'ADMIN';
   const isRecepcion = me?.rol === 'RECEPCION';
-  const canManageUsers = isAdmin;
-  const canEditHuespedOnly = isAdmin || isRecepcion;
+  const canManage = isAdmin || isRecepcion;
+  const canDelete = isAdmin;
 
-  const updateUserMutation = useUpdateUser();
-  const deleteUserMutation = useDeleteUser();
+  const createClienteMutation = useCreateCliente();
+  const updateClienteMutation = useUpdateCliente();
+  const deleteClienteMutation = useDeleteCliente();
 
   const [clienteModalOpen, setClienteModalOpen] = React.useState(false);
-  const [clienteEditing, setClienteEditing] =
-    React.useState<ClientListItem | null>(null);
-  const [confirmDeleteCliente, setConfirmDeleteCliente] =
-    React.useState<ClientListItem | null>(null);
+  const [clienteEditing, setClienteEditing] = React.useState<Cliente | null>(null);
+  const [confirmDeleteCliente, setConfirmDeleteCliente] = React.useState<Cliente | null>(null);
   const [clienteSearch, setClienteSearch] = React.useState('');
   const [clientePage, setClientePage] = React.useState(1);
-  const [clienteRol, setClienteRol] = React.useState<ClienteRolFilter>('all');
-  const clienteLimit = 8;
+  const [activeTab, setActiveTab] = React.useState<ClienteFilterTab>('all');
+  const clienteLimit = 10;
 
-  const usersQuery = useUsersPaginated({
+  const clientesQuery = useClientesPaginated({
     keyword: clienteSearch,
     page: clientePage,
     limit: clienteLimit,
-    rol: clienteRol === 'all' ? undefined : clienteRol,
   });
 
   React.useEffect(() => {
     setClientePage(1);
-  }, [clienteSearch, clienteRol]);
+  }, [clienteSearch]);
 
   React.useEffect(() => {
-    if (usersQuery.isError) {
-      const err = usersQuery.error as unknown as ApiErrorResponse | Error | null;
-      const msg =
-        (err && 'message' in err ? err.message : undefined) ||
-        'No se pudo cargar la lista de clientes';
-      toast.error('Error al cargar clientes', msg);
+    if (clientesQuery.isError) {
+      toast.error(
+        'Error al cargar clientes',
+        'No se pudo conectar con el servicio de reservaciones y clientes.'
+      );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersQuery.isError, usersQuery.error]);
+  }, [clientesQuery.isError, toast]);
 
-  function openEditCliente(cliente: ClientListItem) {
+  function openCreateCliente() {
+    setClienteEditing(null);
+    setClienteModalOpen(true);
+  }
+
+  function openEditCliente(cliente: Cliente) {
     setClienteEditing(cliente);
     setClienteModalOpen(true);
   }
 
-  async function handleClienteSubmit(payload: UpdateUserPayload & { id: string }) {
+  async function handleClienteSubmit(payload: {
+    id?: string;
+    documento: string;
+    nombre: string;
+    email: string;
+    telefono?: string;
+    direccion?: string;
+    observaciones?: string;
+    acompanantes?: Array<{
+      id?: string;
+      nombre: string;
+      documento?: string;
+      parentesco?: string;
+      telefono?: string;
+    }>;
+  }) {
     try {
-      const { id, ...rest } = payload;
-      await updateUserMutation.mutateAsync({ id, payload: rest });
-      toast.success(
-        'Cliente actualizado',
-        `Se actualizaron los datos de "${payload.nombre ?? '(cliente)'}"`
-      );
+      if (payload.id) {
+        // Actualizar
+        await updateClienteMutation.mutateAsync({
+          id: payload.id,
+          payload: {
+            documento: payload.documento,
+            nombre: payload.nombre,
+            email: payload.email,
+            telefono: payload.telefono,
+            direccion: payload.direccion,
+            observaciones: payload.observaciones,
+          },
+        });
+        toast.success(
+          'Cliente actualizado',
+          `Se actualizaron los datos de "${payload.nombre}" exitosamente.`
+        );
+      } else {
+        // Crear
+        await createClienteMutation.mutateAsync({
+          documento: payload.documento,
+          nombre: payload.nombre,
+          email: payload.email,
+          telefono: payload.telefono,
+          direccion: payload.direccion,
+          observaciones: payload.observaciones,
+          acompanantes: payload.acompanantes,
+        });
+        toast.success(
+          'Cliente registrado',
+          `"${payload.nombre}" fue registrado correctamente.`
+        );
+      }
       setClienteModalOpen(false);
       setClienteEditing(null);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'No se pudo guardar el cliente';
+      const message = err instanceof Error ? err.message : 'Error inesperado';
       toast.error('Error al guardar cliente', message);
     }
   }
@@ -184,87 +227,120 @@ function ClientesPage() {
   async function confirmDeleteClienteHandler() {
     if (!confirmDeleteCliente) return;
     try {
-      await deleteUserMutation.mutateAsync(confirmDeleteCliente.id);
+      await deleteClienteMutation.mutateAsync(confirmDeleteCliente.id);
       toast.success(
-        'Usuario eliminado',
-        `"${confirmDeleteCliente.nombre}" fue removido del sistema`
+        'Cliente eliminado',
+        `"${confirmDeleteCliente.nombre}" fue removido de la base de datos.`
       );
       setConfirmDeleteCliente(null);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'No se pudo eliminar el usuario';
-      toast.error('Error al eliminar usuario', message);
+        err instanceof Error ? err.message : 'No se pudo eliminar el cliente';
+      toast.error('Error al eliminar cliente', message);
     }
   }
 
+  // Filtrado local por pestañas rápidas si aplica
+  const rawItems = clientesQuery.data?.items ?? [];
+  const filteredItems = React.useMemo(() => {
+    if (activeTab === 'con_acompanantes') {
+      return rawItems.filter((c) => (c.acompanantes?.length ?? 0) > 0);
+    }
+    if (activeTab === 'con_reservas') {
+      return rawItems.filter((c) => (c.reservaciones_count ?? (c.reservaciones?.length ?? 0)) > 0);
+    }
+    if (activeTab === 'vip') {
+      return rawItems.filter((c) => {
+        const rCount = c.reservaciones_count ?? (c.reservaciones?.length ?? 0);
+        const gasto = (c.reservaciones ?? []).reduce(
+          (sum, r) => sum + (Number(r.precio_total) || 0),
+          0
+        );
+        return rCount >= 3 || gasto >= 500;
+      });
+    }
+    return rawItems;
+  }, [rawItems, activeTab]);
+
   return (
     <div className="space-y-6">
+      {/* Header Card */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="success">Clientes</Badge>
+                <Badge variant="success">Gestión de Clientes</Badge>
                 <h2 className="text-xl font-bold text-slate-900">
-                  Registro de clientes
+                  Directorio de Clientes y Acompañantes
                 </h2>
               </div>
               <p className="mt-1 text-sm text-slate-500">
-                Visualiza todos los usuarios registrados, su historial de
-                reservas e ingresos generados.
+                Registro independiente de huéspedes y sus acompañantes frecuentes, separados de los accesos al sistema.
               </p>
             </div>
+            {canManage ? (
+              <Button
+                onClick={openCreateCliente}
+                className="gap-2 bg-primary-600 hover:bg-primary-700 text-white shadow-sm"
+              >
+                <UserPlus className="h-4 w-4" />
+                Nuevo Cliente
+              </Button>
+            ) : null}
           </div>
         </CardContent>
       </Card>
 
+      {/* Resumen */}
       <ClientSummary
-        clients={usersQuery.data?.items ?? []}
-        total={usersQuery.data?.meta.total ?? 0}
+        clients={rawItems}
+        total={clientesQuery.data?.meta.total ?? 0}
       />
 
-      <section>
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900">
-              Lista de usuarios
-            </h3>
-            <p className="text-sm text-slate-500">
-              Busca por nombre o email y filtra por rol.
-            </p>
+      {/* Filtros y Búsqueda */}
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="w-full sm:max-w-md">
+            <Input
+              placeholder="Buscar por documento, nombre, email o teléfono..."
+              leftIcon={<SearchIcon className="h-4 w-4 text-slate-400" />}
+              value={clienteSearch}
+              onChange={(e) => setClienteSearch(e.target.value)}
+              className="bg-white shadow-2xs"
+            />
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="w-full sm:max-w-xs">
-              <Input
-                placeholder="Buscar nombre o email..."
-                leftIcon={<SearchIcon className="h-4 w-4" />}
-                value={clienteSearch}
-                onChange={(e) => setClienteSearch(e.target.value)}
-              />
-            </div>
+
+          {/* Tabs rápidas */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              { id: 'all', label: 'Todos' },
+              { id: 'con_acompanantes', label: 'Con Acompañantes' },
+              { id: 'con_reservas', label: 'Con Reservas' },
+              { id: 'vip', label: 'VIP' },
+            ].map((tab) => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id as ClienteFilterTab)}
+                  className={cn(
+                    'rounded-full px-3 py-1.5 text-xs font-semibold transition-all',
+                    active
+                      ? 'bg-primary-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  )}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          {rolFilterOptions.map((opt) => {
-            const active = clienteRol === opt.value;
-            return (
-              <button
-                key={String(opt.value)}
-                type="button"
-                onClick={() => setClienteRol(opt.value as ClienteRolFilter)}
-                className={cn(
-                  'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  active
-                    ? 'border-primary-600 bg-primary-600 text-white shadow-sm'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
-                )}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-        {usersQuery.isLoading ? (
+
+        {/* Tabla */}
+        {clientesQuery.isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <div
@@ -273,7 +349,7 @@ function ClientesPage() {
               />
             ))}
           </div>
-        ) : usersQuery.isError ? (
+        ) : clientesQuery.isError ? (
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
@@ -282,58 +358,37 @@ function ClientesPage() {
                     Error al cargar clientes
                   </p>
                   <p className="text-sm text-rose-600">
-                    {(() => {
-                      const e = usersQuery.error as unknown as
-                        | ApiErrorResponse
-                        | Error
-                        | null;
-                      return e && 'message' in e
-                        ? e.message
-                        : 'Inténtalo de nuevo en unos momentos.';
-                    })()}
+                    Inténtalo de nuevo en unos momentos.
                   </p>
                 </div>
-                <Button onClick={() => usersQuery.refetch()}>Reintentar</Button>
+                <Button onClick={() => clientesQuery.refetch()}>Reintentar</Button>
               </div>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-3">
             <ClientesTable
-              clients={usersQuery.data?.items ?? []}
-              isLoading={usersQuery.isLoading || usersQuery.isFetching}
-              canEdit={
-                canManageUsers ||
-                (canEditHuespedOnly && clienteEditing?.rol === 'HUESPED') ||
-                canEditHuespedOnly
-              }
-              canDelete={canManageUsers}
-              onEdit={(c) => {
-                if (!canEditHuespedOnly) return;
-                if (!canManageUsers && c.rol !== 'HUESPED') {
-                  toast.warning(
-                    'Solo puedes editar huéspedes',
-                    'Contacta a un administrador para cambiar datos de otros roles.'
-                  );
-                  return;
-                }
-                openEditCliente(c);
-              }}
-              onDelete={(c) => canManageUsers && setConfirmDeleteCliente(c)}
+              clients={filteredItems}
+              isLoading={clientesQuery.isLoading || clientesQuery.isFetching}
+              canEdit={canManage}
+              canDelete={canDelete}
+              onEdit={openEditCliente}
+              onDelete={(c) => canDelete && setConfirmDeleteCliente(c)}
             />
             <Pagination
-              page={usersQuery.data?.meta.page ?? clientePage}
-              totalPages={usersQuery.data?.meta.totalPages ?? 1}
-              totalItems={usersQuery.data?.meta.total}
-              perPage={usersQuery.data?.meta.perPage ?? clienteLimit}
+              page={clientesQuery.data?.meta.page ?? clientePage}
+              totalPages={clientesQuery.data?.meta.totalPages ?? 1}
+              totalItems={clientesQuery.data?.meta.total}
+              perPage={clientesQuery.data?.meta.perPage ?? clienteLimit}
               onChange={(p) => setClientePage(p)}
-              isFetching={usersQuery.isFetching}
+              isFetching={clientesQuery.isFetching}
               showInfo={true}
             />
           </div>
         )}
       </section>
 
+      {/* Modal Crear / Editar Cliente */}
       <ClienteModal
         open={clienteModalOpen}
         onClose={() => {
@@ -341,82 +396,56 @@ function ClientesPage() {
           setClienteEditing(null);
         }}
         initialValue={clienteEditing}
-        canEditRole={canManageUsers}
         onSubmit={handleClienteSubmit}
-        isLoading={updateUserMutation.isPending}
+        isLoading={createClienteMutation.isPending || updateClienteMutation.isPending}
       />
 
+      {/* Dialog Eliminar Cliente */}
       <Dialog
         open={!!confirmDeleteCliente}
         onClose={() => setConfirmDeleteCliente(null)}
-        title="Eliminar usuario"
-        description="Esta acción es irreversible. Si el usuario tiene reservas asociadas no podrá eliminarse y deberás contactar a soporte."
+        title="Eliminar Cliente"
+        description="Esta acción eliminará el cliente y sus acompañantes del directorio de clientes."
         footer={
           <>
             <Button
               variant="outline"
               onClick={() => setConfirmDeleteCliente(null)}
-              disabled={deleteUserMutation.isPending}
+              disabled={deleteClienteMutation.isPending}
             >
-              Volver
+              Cancelar
             </Button>
             <Button
               variant="destructive"
-              loading={deleteUserMutation.isPending}
+              loading={deleteClienteMutation.isPending}
               leftIcon={<Trash2 className="h-4 w-4" />}
               onClick={confirmDeleteClienteHandler}
             >
-              Sí, eliminar usuario
+              Sí, eliminar cliente
             </Button>
           </>
         }
       >
         {confirmDeleteCliente ? (
-          <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4 text-sm text-rose-800">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-sm font-semibold text-white shadow-sm ring-2 ring-white">
-                {confirmDeleteCliente.nombre
-                  .split(' ')
-                  .map((w) => w[0])
-                  .slice(0, 2)
-                  .join('')
-                  .toUpperCase()}
-              </div>
-              <div className="space-y-1">
-                <p className="font-semibold text-slate-900">
-                  {confirmDeleteCliente.nombre}
-                </p>
-                <p className="text-xs text-slate-600">
-                  {confirmDeleteCliente.email}
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <Badge
-                    variant="outline"
-                    className="rounded-full border bg-white text-slate-700"
-                  >
-                    {roleLabels[confirmDeleteCliente.rol] ??
-                      confirmDeleteCliente.rol}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="rounded-full border bg-white text-slate-700"
-                  >
-                    {confirmDeleteCliente.reservaciones_count} reserva
-                    {confirmDeleteCliente.reservaciones_count === 1 ? '' : 's'}
-                  </Badge>
-                  {confirmDeleteCliente.createdAt ? (
-                    <span className="text-xs text-slate-500">
-                      Registrado {formatDate(confirmDeleteCliente.createdAt)}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
+          <div className="rounded-xl border border-rose-100 bg-rose-50/70 p-4 text-sm text-rose-900 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-base">{confirmDeleteCliente.nombre}</span>
+              <Badge variant="outline" className="font-mono text-xs">
+                {confirmDeleteCliente.documento}
+              </Badge>
             </div>
+            <p className="text-xs text-rose-700">
+              {confirmDeleteCliente.email}
+              {confirmDeleteCliente.telefono ? ` • ${confirmDeleteCliente.telefono}` : ''}
+            </p>
+            {confirmDeleteCliente.acompanantes && confirmDeleteCliente.acompanantes.length > 0 ? (
+              <p className="text-xs text-rose-600 font-medium">
+                Nota: También se desvincularán sus {confirmDeleteCliente.acompanantes.length} acompañante(s).
+              </p>
+            ) : null}
           </div>
         ) : null}
       </Dialog>
     </div>
   );
 }
-
-export default ClientesPage;

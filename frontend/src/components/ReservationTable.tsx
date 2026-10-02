@@ -134,11 +134,16 @@ function ReservationTable({
                       <td className="px-4 py-3">
                         <div className="flex flex-col leading-tight">
                           <span className="text-sm font-medium text-slate-800">
-                            {r.usuario?.nombre ?? '—'}
+                            {r.cliente?.nombre ?? r.usuario?.nombre ?? '—'}
                           </span>
                           <span className="text-xs text-slate-500">
-                            {r.usuario?.email ?? r.usuario_id}
+                            {r.cliente?.email ?? r.usuario?.email ?? r.cliente_id ?? r.usuario_id}
                           </span>
+                          {r.acompanantes && r.acompanantes.length > 0 && (
+                            <span className="text-[10px] text-primary-700 font-medium mt-0.5">
+                              +{r.acompanantes.length} acompañante{r.acompanantes.length > 1 ? 's' : ''}
+                            </span>
+                          )}
                         </div>
                       </td>
                     ) : null}

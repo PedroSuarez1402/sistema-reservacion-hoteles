@@ -47,15 +47,17 @@ function LoginInner() {
 
   React.useEffect(() => {
     if (isAuthenticated && user) {
-      const finalRedirect =
-        redirect === '/dashboard'
-          ? isRecepcionOrAdmin
-            ? '/dashboard/admin'
-            : '/dashboard/mis-reservas'
-          : redirect;
+      let finalRedirect = redirect;
+      if (
+        !redirect ||
+        redirect === '/dashboard' ||
+        redirect === '/dashboard/mis-reservas'
+      ) {
+        finalRedirect = user.rol === 'ADMIN' ? '/dashboard/admin' : '/dashboard/recepcion';
+      }
       router.replace(finalRedirect);
     }
-  }, [isAuthenticated, isRecepcionOrAdmin, redirect, router, user]);
+  }, [isAuthenticated, redirect, router, user]);
 
   async function onSubmit(values: LoginFormValues) {
     try {
@@ -131,15 +133,6 @@ function LoginInner() {
         </CardContent>
       </Card>
 
-      <p className="text-center text-sm text-slate-500">
-        ¿No tienes cuenta?{' '}
-        <Link
-          href="/register"
-          className="font-medium text-primary-600 hover:text-primary-700 hover:underline"
-        >
-          Crea una cuenta
-        </Link>
-      </p>
     </div>
   );
 }

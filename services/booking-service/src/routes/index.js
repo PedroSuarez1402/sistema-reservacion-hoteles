@@ -3,6 +3,7 @@ import sequelize from '../config/database.js';
 import reservationRoutes from './reservation.routes.js';
 import userRoutes from './user.routes.js';
 import paqueteRoutes from './paquete.routes.js';
+import clienteRoutes from './cliente.routes.js';
 
 const router = Router();
 
@@ -21,8 +22,9 @@ router.get('/health', async (req, res, next) => {
   }
 });
 
-// ROUTES - Booking Service expone: reservaciones + usuarios (incl. auth) + paquetes
+// ROUTES - Booking Service expone: reservaciones + clientes + usuarios (staff) + paquetes
 router.use('/reservations', reservationRoutes);
+router.use('/clientes', clienteRoutes);
 router.use('/users', userRoutes);
 router.use('/paquetes', paqueteRoutes);
 

@@ -3,14 +3,14 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { CalendarDays, LayoutDashboard, Settings2, Hotel, Users } from 'lucide-react';
+import { Hotel, Users, ClipboardCheck, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import useAuth from '@/hooks/useAuth';
 import type { UserRole } from '@/types';
 
 function DashboardSidebar() {
   const pathname = usePathname();
-  const { isRecepcionOrAdmin, user: me } = useAuth();
+  const { user: me } = useAuth();
   const myRol = me?.rol;
 
   const navItems = React.useMemo(() => {
@@ -22,37 +22,33 @@ function DashboardSidebar() {
     };
     const items: Item[] = [
       {
-        href: '/dashboard/mis-reservas',
-        label: 'Mis Reservas',
-        icon: <CalendarDays className="h-4 w-4" />,
-        roles: ['HUESPED', 'RECEPCION'],
-      },
-    ];
-    if (isRecepcionOrAdmin) {
-      items.unshift({
-        href: '/dashboard/admin',
-        label: 'Panel Administrativo',
-        icon: <Hotel className="h-4 w-4" />,
+        href: '/dashboard/recepcion',
+        label: 'Consola Recepción',
+        icon: <ClipboardCheck className="h-4 w-4" />,
         roles: ['ADMIN', 'RECEPCION'],
-      });
-      items.splice(1, 0, {
+      },
+      {
         href: '/dashboard/clientes',
         label: 'Clientes',
         icon: <Users className="h-4 w-4" />,
         roles: ['ADMIN', 'RECEPCION'],
-      });
-    }
-    return myRol ? items.filter((item) => item.roles.includes(myRol)) : items;
-  }, [isRecepcionOrAdmin, myRol]);
+      },
+      {
+        href: '/dashboard/admin',
+        label: 'Inventario Hotel',
+        icon: <Hotel className="h-4 w-4" />,
+        roles: ['ADMIN'], // Exclusivo de ADMIN
+      },
+    ];
+
+    return myRol ? items.filter((item) => item.roles.includes(myRol)) : [];
+  }, [myRol]);
 
   return (
     <aside className="w-full shrink-0 lg:w-64 lg:border-r lg:border-slate-200 lg:bg-white/40">
       <nav className="flex gap-1 overflow-x-auto px-4 py-3 lg:flex-col lg:gap-1.5 lg:px-3 lg:py-5">
         {navItems.map((item) => {
-          const active =
-            item.href === '/dashboard/mis-reservas'
-              ? pathname?.startsWith('/dashboard/mis-reservas') ?? false
-              : pathname?.startsWith(item.href) ?? false;
+          const active = pathname?.startsWith(item.href) ?? false;
           return (
             <Link
               key={item.href}
@@ -60,7 +56,7 @@ function DashboardSidebar() {
               className={cn(
                 'inline-flex w-full shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                 active
-                  ? 'bg-primary-50 text-primary-700 ring-1 ring-primary-100'
+                  ? 'bg-primary-50 text-primary-700 ring-1 ring-primary-100 font-semibold'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               )}
             >
@@ -77,27 +73,32 @@ function DashboardSidebar() {
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isLoading, isRecepcionOrAdmin, isAdmin } = useAuth();
+  const { isAuthenticated, isLoading, isRecepcionOrAdmin, user } = useAuth();
 
   React.useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
-      const redirect = encodeURIComponent(pathname ?? '/dashboard');
+      const redirect = encodeURIComponent(pathname ?? '/dashboard/recepcion');
       router.replace(`/login?redirect=${redirect}`);
       return;
     }
-    const isStaffRoute =
-      pathname?.startsWith('/dashboard/admin') ||
-      pathname?.startsWith('/dashboard/clientes');
-    if (isStaffRoute && !isRecepcionOrAdmin) {
-      router.replace('/dashboard/mis-reservas');
+
+    if (!isRecepcionOrAdmin) {
+      router.replace('/');
       return;
     }
-    if (pathname?.startsWith('/dashboard/mis-reservas') && isAdmin) {
-      router.replace('/dashboard/admin');
+
+    // Si un rol RECEPCION intenta entrar a /dashboard/admin, redirigir a /dashboard/recepcion
+    if (pathname?.startsWith('/dashboard/admin') && user?.rol === 'RECEPCION') {
+      router.replace('/dashboard/recepcion');
       return;
     }
-  }, [isAuthenticated, isLoading, isRecepcionOrAdmin, isAdmin, pathname, router]);
+
+    if (pathname === '/dashboard') {
+      router.replace(user?.rol === 'ADMIN' ? '/dashboard/admin' : '/dashboard/recepcion');
+      return;
+    }
+  }, [isAuthenticated, isLoading, isRecepcionOrAdmin, user, pathname, router]);
 
   if (isLoading || !isAuthenticated) {
     return (

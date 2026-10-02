@@ -59,7 +59,10 @@ export interface Room {
   updatedAt?: string;
 }
 
-export interface Servicio {
+// ---------------------------------------------------------------------------
+// Modelo: Servicio Adicional (Leaf en Patrón Composite)
+// ---------------------------------------------------------------------------
+export interface ServicioAdicional {
   id: string;
   nombre: string;
   precio: number | string;
@@ -68,31 +71,101 @@ export interface Servicio {
   PaqueteServicio?: {
     cantidad: number;
   };
+  cantidad?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
+// Alias para compatibilidad con implementaciones existentes
+export type Servicio = ServicioAdicional;
+
+// ---------------------------------------------------------------------------
+// Modelo: Paquete Turístico (Composite en Patrón Composite)
+// ---------------------------------------------------------------------------
 export interface Paquete {
   id: string;
   nombre: string;
   descripcion?: string | null;
   descuento_porcentaje: number | string;
   estado: 'ACTIVO' | 'INACTIVO';
-  servicios?: Servicio[];
+  servicios?: ServicioAdicional[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Desglose del Patrón Composite para cotizaciones y vista de paquetes
+// ---------------------------------------------------------------------------
+export interface DesgloseComponente {
+  tipo: 'SERVICIO_INDIVIDUAL' | 'PAQUETE_COMPUESTO' | 'HOSPEDAJE_ITEM';
+  servicio_id?: string | null;
+  paquete_id?: string | null;
+  nombre: string;
+  precio_unitario?: number;
+  cantidad?: number;
+  descripcion?: string;
+  subtotal?: number;
+  subtotal_bruto?: number;
+  descuento_porcentaje?: number;
+  descuento_monto?: number;
+  total_neto?: number;
+  total_items?: number;
+  componentes?: DesgloseComponente[];
+}
+
+export interface PaqueteConDesglose {
+  paquete: Paquete;
+  composite_desglose?: DesgloseComponente;
+}
+
+export interface Acompanante {
+  id: string;
+  cliente_id: string;
+  reserva_id?: string | null;
+  documento?: string | null;
+  nombre: string;
+  parentesco?: string | null;
+  telefono?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Cliente {
+  id: string;
+  documento: string;
+  nombre: string;
+  email: string;
+  telefono?: string | null;
+  direccion?: string | null;
+  observaciones?: string | null;
+  acompanantes?: Acompanante[];
+  reservaciones?: Reservation[];
+  reservaciones_count?: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface Reservation {
   id: string;
-  usuario_id: string;
+  cliente_id?: string | null;
+  usuario_id?: string | null;
   habitacion_id: string;
   paquete_id?: string | null;
   fecha_inicio: string;
   fecha_fin: string;
   precio_total: number;
   estado: ReservationStatus;
+  metodo_pago?: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
+  tipo_reserva?: 'INMEDIATA' | 'ANTICIPADA';
+  es_prorroga?: boolean;
+  anticipo?: number;
+  observaciones_recepcion?: string | null;
+  notas?: string | null;
   createdAt?: string;
   updatedAt?: string;
   habitacion?: Room;
+  cliente?: Cliente;
+  acompanantes?: Acompanante[];
   usuario?: User;
   paquete?: Paquete;
 }
@@ -163,10 +236,29 @@ export interface RoomAvailabilityParams {
 
 export interface CreateReservationPayload {
   habitacion_id: string;
+  cliente_id?: string;
+  cliente_datos?: {
+    documento: string;
+    nombre: string;
+    email: string;
+    telefono?: string;
+  };
+  acompanantes?: Array<{
+    nombre: string;
+    documento?: string;
+    parentesco?: string;
+    telefono?: string;
+  }>;
+  usuario_id?: string;
   fecha_inicio: string;
   fecha_fin: string;
   paquete_id?: string | null;
   precio_total?: number;
+  metodo_pago?: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
+  tipo_reserva?: 'INMEDIATA' | 'ANTICIPADA';
+  es_prorroga?: boolean;
+  anticipo?: number;
+  observaciones_recepcion?: string | null;
 }
 
 export interface UpdateRoomPayload {

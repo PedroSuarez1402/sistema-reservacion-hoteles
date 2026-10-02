@@ -269,6 +269,21 @@ function AdminPage() {
   const [confirmDeleteReservation, setConfirmDeleteReservation] = React.useState<Reservation | null>(null);
 
   const roomsQuery = useRooms();
+
+  const roomById = React.useMemo(() => {
+    const map: Record<string, Room> = {};
+    for (const rm of roomsQuery.data ?? []) {
+      map[rm.id] = rm;
+    }
+    return map;
+  }, [roomsQuery.data]);
+
+  const enrichedReservations = React.useMemo(() => {
+    return (reservationsQuery.data ?? []).map((r) => ({
+      ...r,
+      habitacion: r.habitacion || roomById[r.habitacion_id],
+    }));
+  }, [reservationsQuery.data, roomById]);
   const createRoomMutation = useCreateRoom();
   const updateRoomMutation = useUpdateRoom();
   const deleteRoomMutation = useDeleteRoom();
@@ -521,9 +536,9 @@ function AdminPage() {
 
       {activeTab === 'reservaciones' ? (
         <>
-          <ReservationSummary reservations={reservationsQuery.data ?? []} />
+          <ReservationSummary reservations={enrichedReservations} />
           <ReservationTable
-            reservations={reservationsQuery.data}
+            reservations={enrichedReservations}
             isLoading={reservationsQuery.isLoading || reservationsQuery.isFetching}
             isStaff={true}
             showUserColumn={true}
@@ -814,7 +829,7 @@ function AdminPage() {
               Reserva #{confirmCancel.id.slice(0, 8)}
             </p>
             <p className="mt-1 text-amber-700">
-              Cliente: {confirmCancel.usuario?.nombre ?? confirmCancel.usuario_id.slice(0, 6)} · Hab.{' '}
+              Cliente: {confirmCancel.cliente?.nombre ?? confirmCancel.usuario?.nombre ?? confirmCancel.cliente_id?.slice(0, 6) ?? confirmCancel.usuario_id?.slice(0, 6) ?? '—'} · Hab.{' '}
               {confirmCancel.habitacion?.numero ?? confirmCancel.habitacion_id.slice(0, 6)}
             </p>
             <p className="mt-2 font-semibold text-slate-800">
@@ -855,7 +870,7 @@ function AdminPage() {
               Reserva #{confirmDeleteReservation.id.slice(0, 8)}
             </p>
             <p className="mt-1 text-rose-700">
-              Cliente: {confirmDeleteReservation.usuario?.nombre ?? confirmDeleteReservation.usuario_id.slice(0, 6)}
+              Cliente: {confirmDeleteReservation.cliente?.nombre ?? confirmDeleteReservation.usuario?.nombre ?? confirmDeleteReservation.cliente_id?.slice(0, 6) ?? confirmDeleteReservation.usuario_id?.slice(0, 6) ?? '—'}
             </p>
           </div>
         ) : null}

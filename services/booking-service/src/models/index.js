@@ -4,16 +4,51 @@ import Reservation from './Reservation.js';
 import Paquete from './Paquete.js';
 import Servicio from './Servicio.js';
 import PaqueteServicio from './PaqueteServicio.js';
+import Cliente from './Cliente.js';
+import Acompanante from './Acompanante.js';
 
 // =========================================================
 //  ASOCIACIONES CENTRALIZADAS - BOOKING SERVICE
 // =========================================================
 
-// --- Usuario <--> Reservación ---
+// --- Cliente <--> Reservación (1:N) ---
+Cliente.hasMany(Reservation, {
+  foreignKey: 'cliente_id',
+  as: 'reservaciones',
+  onDelete: 'SET NULL',
+});
+Reservation.belongsTo(Cliente, {
+  foreignKey: 'cliente_id',
+  as: 'cliente',
+});
+
+// --- Cliente <--> Acompañante (1:N) ---
+Cliente.hasMany(Acompanante, {
+  foreignKey: 'cliente_id',
+  as: 'acompanantes',
+  onDelete: 'CASCADE',
+});
+Acompanante.belongsTo(Cliente, {
+  foreignKey: 'cliente_id',
+  as: 'cliente',
+});
+
+// --- Reservación <--> Acompañante (1:N) ---
+Reservation.hasMany(Acompanante, {
+  foreignKey: 'reserva_id',
+  as: 'acompanantes',
+  onDelete: 'SET NULL',
+});
+Acompanante.belongsTo(Reservation, {
+  foreignKey: 'reserva_id',
+  as: 'reservacion',
+});
+
+// --- Usuario (Staff) <--> Reservación ---
 User.hasMany(Reservation, {
   foreignKey: 'usuario_id',
   as: 'reservaciones',
-  onDelete: 'RESTRICT',
+  onDelete: 'SET NULL',
 });
 Reservation.belongsTo(User, {
   foreignKey: 'usuario_id',
@@ -49,6 +84,8 @@ export {
   sequelize,
   testConnection,
   User,
+  Cliente,
+  Acompanante,
   Reservation,
   Paquete,
   Servicio,

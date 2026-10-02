@@ -4,6 +4,8 @@
  */
 
 import ReservationRepository from '../repositories/reservation.repository.js';
+import ClienteRepository from '../repositories/cliente.repository.js';
+import ClienteService from './cliente.service.js';
 import { Paquete, Servicio } from '../models/index.js';
 import {
   BadRequestError,
@@ -106,9 +108,36 @@ class ReservationService {
    * ReservationService actúa como DIRECTOR orquestando los pasos de ensamblado.
    */
     static async createReservation(data) {
-        const { usuario_id, habitacion_id, paquete_id, fecha_inicio, fecha_fin, estado, precio_total, notas } = data;
+        const {
+            cliente_id,
+            cliente_datos,
+            acompanantes,
+            usuario_id,
+            habitacion_id,
+            paquete_id,
+            fecha_inicio,
+            fecha_fin,
+            estado,
+            precio_total,
+            notas,
+            metodo_pago,
+            tipo_reserva,
+            anticipo,
+            es_prorroga,
+            observaciones_recepcion,
+        } = data;
 
-        assertRequired(usuario_id, 'El usuario es requerido');
+        // 1. Resolver el ID del cliente titular
+        let targetClienteId = cliente_id || null;
+        if (!targetClienteId && cliente_datos) {
+            const resolvedClient = await ClienteService.findOrCreate(cliente_datos);
+            targetClienteId = resolvedClient.id;
+        }
+        if (!targetClienteId && usuario_id) {
+            targetClienteId = usuario_id;
+        }
+
+        assertRequired(targetClienteId, 'El cliente titular es requerido');
         assertRequired(habitacion_id, 'La habitación es requerida');
         assertRequired(fecha_inicio, 'La fecha de inicio es requerida');
         assertRequired(fecha_fin, 'La fecha de fin es requerida');
@@ -212,7 +241,9 @@ class ReservationService {
 
         // ---- Uso de ReservationBuilder (Director construye paso a paso con el Composite) ----
         const builder = new ReservationBuilder()
-            .conHuesped(usuario_id)
+            .conCliente(targetClienteId)
+            .conHuesped(usuario_id || null)
+            .conAcompanantes(acompanantes || [])
             .paraHabitacion(hid)
             .conFechas(fecha_inicio, fecha_fin)
             .conPaquete(paquete_id || null)
@@ -220,11 +251,31 @@ class ReservationService {
             .conTotalManual(precioFinal)
             .conEstado(estado || 'CONFIRMADA');
         if (notas) builder.conNotas(notas);
+        if (metodo_pago) builder.conMetodoPago(metodo_pago);
+        if (tipo_reserva) builder.conTipoReserva(tipo_reserva);
+        if (anticipo !== undefined && anticipo !== null) builder.conAnticipo(anticipo);
+        if (es_prorroga !== undefined && es_prorroga !== null) builder.conProrroga(es_prorroga);
+        if (observaciones_recepcion) builder.conObservacionesRecepcion(observaciones_recepcion);
 
         // build() valida campos obligatorios y regresa payload compatible con Sequelize
         const payloadRepo = builder.build();
 
         const nuevaReserva = await ReservationRepository.create(payloadRepo);
+
+        // 3. Registrar acompañantes vinculados a esta reservación y al cliente
+        if (Array.isArray(acompanantes) && acompanantes.length > 0) {
+            for (const ac of acompanantes) {
+                if (ac && ac.nombre && String(ac.nombre).trim().length > 0) {
+                    await ClienteRepository.addAcompanante(targetClienteId, {
+                        nombre: String(ac.nombre).trim(),
+                        documento: ac.documento ? String(ac.documento).trim() : null,
+                        parentesco: ac.parentesco ? String(ac.parentesco).trim() : 'Familiar',
+                        telefono: ac.telefono ? String(ac.telefono).trim() : null,
+                        reserva_id: nuevaReserva.id,
+                    });
+                }
+            }
+        }
 
         // =====================================================================
         // Publicación de Evento al Message Broker (Patrón Pub/Sub - Publisher)
@@ -235,6 +286,10 @@ class ReservationService {
             topico: 'RESERVA_CREADA',
             payload: {
                 id: RESERVA_COMPLETA.id,
+                cliente_id: RESERVA_COMPLETA.cliente_id,
+                cliente_nombre: RESERVA_COMPLETA.cliente?.nombre,
+                cliente_documento: RESERVA_COMPLETA.cliente?.documento,
+                acompanantes_count: RESERVA_COMPLETA.acompanantes?.length || 0,
                 usuario_id: RESERVA_COMPLETA.usuario_id,
                 habitacion_id: RESERVA_COMPLETA.habitacion_id,
                 fecha_inicio: RESERVA_COMPLETA.fecha_inicio,
@@ -433,10 +488,31 @@ class ReservationService {
                 diasReserva,
             });
         }
-        // Actualizar estado si es administrador o recepción y estado es válido
+        if (data.cliente_id !== undefined) updateData.cliente_id = data.cliente_id || null;
         if (data.estado && esAdminORecepcion) updateData.estado = data.estado;
+        if (data.paquete_id !== undefined) updateData.paquete_id = data.paquete_id || null;
+        if (data.metodo_pago !== undefined) updateData.metodo_pago = String(data.metodo_pago).trim().toUpperCase();
+        if (data.tipo_reserva !== undefined) updateData.tipo_reserva = String(data.tipo_reserva).trim().toUpperCase();
+        if (data.anticipo !== undefined && data.anticipo !== null) updateData.anticipo = Number(data.anticipo) || 0;
+        if (data.observaciones_recepcion !== undefined) updateData.observaciones_recepcion = data.observaciones_recepcion;
+        if (data.notas !== undefined) updateData.notas = data.notas;
 
         await ReservationRepository.update(id, updateData);
+
+        if (Array.isArray(data.acompanantes) && (reserva.cliente_id || data.cliente_id)) {
+            const cid = data.cliente_id || reserva.cliente_id;
+            for (const ac of data.acompanantes) {
+                if (ac && ac.nombre && String(ac.nombre).trim().length > 0) {
+                    await ClienteRepository.addAcompanante(cid, {
+                        nombre: String(ac.nombre).trim(),
+                        documento: ac.documento ? String(ac.documento).trim() : null,
+                        parentesco: ac.parentesco ? String(ac.parentesco).trim() : 'Familiar',
+                        telefono: ac.telefono ? String(ac.telefono).trim() : null,
+                        reserva_id: id,
+                    });
+                }
+            }
+        }
 
         return await ReservationRepository.getById(id);
     }
@@ -464,6 +540,162 @@ class ReservationService {
         }
 
         return await ReservationRepository.delete(id);
+    }
+
+    /**
+     * Transición a Check-in: actualiza estado a 'CONFIRMADA' y registra timestamp en observaciones.
+     */
+    static async checkIn(id, usuarioQueSolicita, data = {}) {
+        assertRequired(id, 'El id de la reserva es requerido');
+        const reserva = await ReservationRepository.getById(id, { includeUser: false });
+        if (!reserva) {
+            throw new NotFoundError('Reserva no encontrada.');
+        }
+
+        if (reserva.estado === 'CANCELADA') {
+            throw new ConflictError('No se puede realizar check-in a una reserva cancelada.');
+        }
+        if (reserva.estado === 'FINALIZADA') {
+            throw new ConflictError('No se puede realizar check-in a una reserva finalizada.');
+        }
+
+        const now = new Date();
+        const timestampStr = now.toISOString();
+        const notaAdicional = data.observaciones ? ` - ${data.observaciones}` : '';
+        const entradaCheckIn = `[Check-in: ${timestampStr}]${notaAdicional}`;
+        const prevObs = reserva.observaciones_recepcion
+            ? `${reserva.observaciones_recepcion}\n${entradaCheckIn}`
+            : entradaCheckIn;
+
+        const updateData = {
+            estado: 'CONFIRMADA',
+            observaciones_recepcion: prevObs,
+        };
+
+        if (data.metodo_pago) {
+            updateData.metodo_pago = String(data.metodo_pago).trim().toUpperCase();
+        }
+        if (data.anticipo !== undefined && data.anticipo !== null) {
+            updateData.anticipo = Number(data.anticipo) || 0;
+        }
+
+        await ReservationRepository.update(id, updateData);
+        return await ReservationRepository.getById(id);
+    }
+
+    /**
+     * Transición a Check-out: actualiza estado a 'FINALIZADA'.
+     */
+    static async checkOut(id, usuarioQueSolicita, data = {}) {
+        assertRequired(id, 'El id de la reserva es requerido');
+        const reserva = await ReservationRepository.getById(id, { includeUser: false });
+        if (!reserva) {
+            throw new NotFoundError('Reserva no encontrada.');
+        }
+
+        if (reserva.estado === 'CANCELADA') {
+            throw new ConflictError('No se puede realizar check-out a una reserva cancelada.');
+        }
+        if (reserva.estado === 'FINALIZADA') {
+            throw new ConflictError('La reserva ya se encuentra finalizada.');
+        }
+
+        const now = new Date();
+        const timestampStr = now.toISOString();
+        const notaAdicional = data.observaciones ? ` - ${data.observaciones}` : '';
+        const entradaCheckOut = `[Check-out: ${timestampStr}]${notaAdicional}`;
+        const prevObs = reserva.observaciones_recepcion
+            ? `${reserva.observaciones_recepcion}\n${entradaCheckOut}`
+            : entradaCheckOut;
+
+        await ReservationRepository.update(id, {
+            estado: 'FINALIZADA',
+            observaciones_recepcion: prevObs,
+        });
+
+        return await ReservationRepository.getById(id);
+    }
+
+    /**
+     * Prórroga de estadía: marca es_prorroga: true y guarda nota de retraso/prórroga.
+     */
+    static async prorroga(id, usuarioQueSolicita, data = {}) {
+        assertRequired(id, 'El id de la reserva es requerido');
+        const reserva = await ReservationRepository.getById(id, { includeUser: false });
+        if (!reserva) {
+            throw new NotFoundError('Reserva no encontrada.');
+        }
+
+        if (reserva.estado === 'CANCELADA' || reserva.estado === 'FINALIZADA') {
+            throw new ConflictError('No se puede prorrogar una reserva cancelada o finalizada.');
+        }
+
+        const motivo = data.motivo || data.observaciones || 'Retraso de salida acordado en recepción';
+        const now = new Date();
+        const timestampStr = now.toISOString();
+        const entradaProrroga = `[Prórroga: ${timestampStr}] ${motivo}`;
+        const prevObs = reserva.observaciones_recepcion
+            ? `${reserva.observaciones_recepcion}\n${entradaProrroga}`
+            : entradaProrroga;
+
+        const updateData = {
+            es_prorroga: true,
+            observaciones_recepcion: prevObs,
+        };
+
+        if (data.nueva_fecha_fin) {
+            const nuevaFechaFin = parseLocalDate(data.nueva_fecha_fin);
+            const fechaInicioActual = parseLocalDate(reserva.fecha_inicio);
+            if (nuevaFechaFin <= fechaInicioActual) {
+                throw new BadRequestError('La nueva fecha de salida debe ser posterior a la fecha de inicio');
+            }
+            const disponible = await ReservationRepository.checkAvailability(
+                reserva.habitacion_id,
+                fechaInicioActual,
+                nuevaFechaFin,
+                reserva.id
+            );
+            if (!disponible) {
+                throw new ConflictError('La habitación no se encuentra disponible hasta la nueva fecha solicitada.');
+            }
+            updateData.fecha_fin = nuevaFechaFin;
+        }
+
+        await ReservationRepository.update(id, updateData);
+        return await ReservationRepository.getById(id);
+    }
+
+    /**
+     * Transición a No-Show: actualiza estado a 'CANCELADA' con nota 'No-Show sin preaviso'.
+     */
+    static async noShow(id, usuarioQueSolicita, data = {}) {
+        assertRequired(id, 'El id de la reserva es requerido');
+        const reserva = await ReservationRepository.getById(id, { includeUser: false });
+        if (!reserva) {
+            throw new NotFoundError('Reserva no encontrada.');
+        }
+
+        if (reserva.estado === 'CANCELADA') {
+            throw new ConflictError('La reserva ya se encuentra cancelada.');
+        }
+        if (reserva.estado === 'FINALIZADA') {
+            throw new ConflictError('No se puede marcar como No-Show una reserva finalizada.');
+        }
+
+        const now = new Date();
+        const timestampStr = now.toISOString();
+        const detalle = data.observaciones ? ` - ${data.observaciones}` : '';
+        const entradaNoShow = `[No-Show sin preaviso: ${timestampStr}] Huésped no se presentó a tiempo${detalle}`;
+        const prevObs = reserva.observaciones_recepcion
+            ? `${reserva.observaciones_recepcion}\n${entradaNoShow}`
+            : entradaNoShow;
+
+        await ReservationRepository.update(id, {
+            estado: 'CANCELADA',
+            observaciones_recepcion: prevObs,
+        });
+
+        return await ReservationRepository.getById(id);
     }
 }
 

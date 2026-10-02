@@ -24,9 +24,17 @@ Reservation.init(
     },
     usuario_id: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: 'usuarios',
+        key: 'id',
+      },
+    },
+    cliente_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'clientes',
         key: 'id',
       },
     },
@@ -59,6 +67,30 @@ Reservation.init(
       defaultValue: 'PENDIENTE',
       allowNull: false,
     },
+    metodo_pago: {
+      type: DataTypes.ENUM('EFECTIVO', 'TRANSFERENCIA', 'TARJETA'),
+      defaultValue: 'EFECTIVO',
+      allowNull: false,
+    },
+    tipo_reserva: {
+      type: DataTypes.ENUM('INMEDIATA', 'ANTICIPADA'),
+      defaultValue: 'ANTICIPADA',
+      allowNull: false,
+    },
+    es_prorroga: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    },
+    anticipo: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0.00,
+      allowNull: false,
+    },
+    observaciones_recepcion: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   },
   {
     sequelize,
@@ -68,6 +100,7 @@ Reservation.init(
       { fields: ['fecha_inicio', 'fecha_fin'] },
       { fields: ['estado'] },
       { fields: ['usuario_id'] },
+      { fields: ['cliente_id'] },
       { fields: ['habitacion_id'] },
     ],
     validate: {

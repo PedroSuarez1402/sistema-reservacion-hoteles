@@ -12,6 +12,8 @@ export const STALE_TIMES = {
   TAG_DETAIL: 10 * 60 * 1000,
   USERS_LIST: 2 * 60 * 1000,
   USER_DETAIL: 5 * 60 * 1000,
+  CLIENTES_LIST: 2 * 60 * 1000,
+  CLIENTE_DETAIL: 5 * 60 * 1000,
 } as const;
 
 export const CACHE_TIMES = {
@@ -48,6 +50,13 @@ export const queryKeys = {
       [...queryKeys.users.all, 'list', params ?? {}] as const,
     detail: (id: string) => [...queryKeys.users.all, 'detail', id] as const,
     summary: (id: string) => [...queryKeys.users.all, 'summary', id] as const,
+  },
+  clientes: {
+    all: ['clientes'] as const,
+    lists: (params?: { keyword?: string; page?: number; limit?: number }) =>
+      [...queryKeys.clientes.all, 'list', params ?? {}] as const,
+    detail: (id: string) => [...queryKeys.clientes.all, 'detail', id] as const,
+    search: (keyword: string) => [...queryKeys.clientes.all, 'search', keyword] as const,
   },
 } as const;
 

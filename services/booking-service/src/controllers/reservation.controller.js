@@ -80,16 +80,42 @@ class ReservationController {
   // Crea una nueva reservación
   static async create(req, res, next) {
     try {
-      const { habitacion_id, fecha_inicio, fecha_fin, estado, precio_total } = req.body;
-      const usuario_id = req.user.id;
+      const {
+        cliente_id,
+        cliente_datos,
+        acompanantes,
+        habitacion_id,
+        fecha_inicio,
+        fecha_fin,
+        estado,
+        precio_total,
+        paquete_id,
+        notas,
+        metodo_pago,
+        tipo_reserva,
+        anticipo,
+        es_prorroga,
+        observaciones_recepcion,
+      } = req.body;
+      const usuario_id = req.body.usuario_id || req.user.id;
 
       const nuevaReserva = await ReservationService.createReservation({
+        cliente_id,
+        cliente_datos,
+        acompanantes,
         usuario_id,
         habitacion_id,
         fecha_inicio,
         fecha_fin,
         estado,
         precio_total,
+        paquete_id,
+        notas,
+        metodo_pago,
+        tipo_reserva,
+        anticipo,
+        es_prorroga,
+        observaciones_recepcion,
       });
 
       res.status(201).json({
@@ -160,6 +186,70 @@ class ReservationController {
       });
     } catch (error) {
       logControllerError('Reservation.remove', error, req);
+      next(error);
+    }
+  }
+
+  // Realiza el check-in asistido y registra timestamp
+  static async checkIn(req, res, next) {
+    try {
+      const { id } = req.params;
+      const actualizada = await ReservationService.checkIn(id, req.user, req.body);
+      res.status(200).json({
+        success: true,
+        message: 'Check-in realizado correctamente',
+        data: actualizada,
+      });
+    } catch (error) {
+      logControllerError('Reservation.checkIn', error, req);
+      next(error);
+    }
+  }
+
+  // Realiza el check-out de la habitación (finaliza reserva)
+  static async checkOut(req, res, next) {
+    try {
+      const { id } = req.params;
+      const actualizada = await ReservationService.checkOut(id, req.user, req.body);
+      res.status(200).json({
+        success: true,
+        message: 'Check-out realizado correctamente',
+        data: actualizada,
+      });
+    } catch (error) {
+      logControllerError('Reservation.checkOut', error, req);
+      next(error);
+    }
+  }
+
+  // Registra prórroga de estadía y nota de retraso
+  static async prorroga(req, res, next) {
+    try {
+      const { id } = req.params;
+      const actualizada = await ReservationService.prorroga(id, req.user, req.body);
+      res.status(200).json({
+        success: true,
+        message: 'Prórroga de reserva registrada correctamente',
+        data: actualizada,
+      });
+    } catch (error) {
+      logControllerError('Reservation.prorroga', error, req);
+      next(error);
+    }
+  }
+
+  // Registra No-Show sin preaviso
+  static async noShow(req, res, next) {
+    try {
+      const { id } = req.params;
+      const actualizada = await ReservationService.noShow(id, req.user, req.body);
+      res.status(200).json({
+        success: true,
+        message: 'Reserva marcada como No-Show sin preaviso',
+        data: actualizada,
+      });
+    } catch (error) {
+      logControllerError('Reservation.noShow', error, req);
       next(error);
     }
   }

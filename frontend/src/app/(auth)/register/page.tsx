@@ -59,13 +59,8 @@ function RegisterPage() {
   });
 
   React.useEffect(() => {
-    if (isAuthenticated && user) {
-      const finalRedirect = isRecepcionOrAdmin
-        ? '/dashboard/admin'
-        : '/dashboard/mis-reservas';
-      router.replace(finalRedirect);
-    }
-  }, [isAuthenticated, isRecepcionOrAdmin, router, user]);
+    router.replace('/login');
+  }, [router]);
 
   async function onSubmit(values: RegisterFormValues) {
     try {

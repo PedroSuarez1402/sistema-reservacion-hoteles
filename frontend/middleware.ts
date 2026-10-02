@@ -36,7 +36,11 @@ function isPublicPath(pathname: string): boolean {
 }
 
 function isAdminRoute(pathname: string): boolean {
-  return pathname.startsWith('/dashboard/admin');
+  return (
+    pathname.startsWith('/dashboard/admin') ||
+    pathname.startsWith('/dashboard/recepcion') ||
+    pathname.startsWith('/dashboard/clientes')
+  );
 }
 
 function isDashboardRoute(pathname: string): boolean {
@@ -75,12 +79,30 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Si intentan entrar a /dashboard/mis-reservas, redirigir a recepción
+  if (pathname.startsWith('/dashboard/mis-reservas')) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/dashboard/recepcion';
+    return NextResponse.redirect(url);
+  }
+
+  // /dashboard/admin (Inventario Hotel) es exclusivo de ADMIN
+  if (pathname.startsWith('/dashboard/admin')) {
+    const payload = decodeJwtPayload<{ rol?: string }>(token);
+    const rol = payload?.rol;
+    if (rol !== 'ADMIN') {
+      const url = req.nextUrl.clone();
+      url.pathname = '/dashboard/recepcion';
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (isAdminRoute(pathname)) {
     const payload = decodeJwtPayload<{ rol?: string }>(token);
     const rol = payload?.rol;
     if (rol !== 'ADMIN' && rol !== 'RECEPCION') {
       const url = req.nextUrl.clone();
-      url.pathname = '/dashboard/mis-reservas';
+      url.pathname = '/login';
       return NextResponse.redirect(url);
     }
   }
@@ -89,10 +111,12 @@ export function middleware(req: NextRequest) {
     const payload = decodeJwtPayload<{ rol?: string }>(token);
     const rol = payload?.rol;
     const url = req.nextUrl.clone();
-    if (rol === 'ADMIN' || rol === 'RECEPCION') {
-      url.pathname = '/dashboard/admin';
+    if (rol === 'ADMIN') {
+      url.pathname = '/dashboard/recepcion';
+    } else if (rol === 'RECEPCION') {
+      url.pathname = '/dashboard/recepcion';
     } else {
-      url.pathname = '/dashboard/mis-reservas';
+      url.pathname = '/login';
     }
     return NextResponse.redirect(url);
   }

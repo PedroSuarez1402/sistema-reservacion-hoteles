@@ -19,7 +19,9 @@ function __localDate(input) {
 
 export class ReservationBuilder {
     // Estado interno encapsulado (campos privados)
+    #clienteId = null;
     #usuarioId = null;
+    #acompanantes = [];
     #habitacionId = null;
     #paqueteId = null;
     #fechaInicio = null;
@@ -32,12 +34,45 @@ export class ReservationBuilder {
     #estado = null;
     #notas = '';
     #cotizacion = null;
+    #metodoPago = 'EFECTIVO';
+    #tipoReserva = 'ANTICIPADA';
+    #anticipo = 0.00;
+    #esProrroga = false;
+    #observacionesRecepcion = null;
 
     /**
-   * Asocia el ID del huésped/usuario titular.
+   * Asocia el ID del cliente titular de la reservación (modelo Cliente).
+   */
+    conCliente(cliente_id) {
+        this.#clienteId = cliente_id ? String(cliente_id).trim() : null;
+        return this;
+    }
+
+    /**
+   * Asocia el ID del usuario titular (o usuario staff que gestiona la reserva).
    */
     conHuesped(usuario_id) {
-        this.#usuarioId = usuario_id;
+        this.#usuarioId = usuario_id ? String(usuario_id).trim() : null;
+        if (!this.#clienteId && this.#usuarioId) {
+            this.#clienteId = this.#usuarioId;
+        }
+        return this;
+    }
+
+    /**
+   * Asocia la lista de acompañantes registrados para esta estancia.
+   */
+    conAcompanantes(lista) {
+        if (Array.isArray(lista)) {
+            this.#acompanantes = lista
+                .filter(a => a && a.nombre && String(a.nombre).trim().length > 0)
+                .map(a => ({
+                    nombre: String(a.nombre).trim(),
+                    documento: a.documento ? String(a.documento).trim() : null,
+                    parentesco: a.parentesco ? String(a.parentesco).trim() : 'Familiar',
+                    telefono: a.telefono ? String(a.telefono).trim() : null,
+                }));
+        }
         return this;
     }
 
@@ -126,13 +161,59 @@ export class ReservationBuilder {
     }
 
     /**
+   * Define el método de pago ('EFECTIVO', 'TRANSFERENCIA', 'TARJETA').
+   */
+    conMetodoPago(metodo) {
+        if (metodo !== undefined && metodo !== null) {
+            this.#metodoPago = String(metodo).trim().toUpperCase();
+        }
+        return this;
+    }
+
+    /**
+   * Define el tipo de reservación ('INMEDIATA' o 'ANTICIPADA').
+   */
+    conTipoReserva(tipo) {
+        if (tipo !== undefined && tipo !== null) {
+            this.#tipoReserva = String(tipo).trim().toUpperCase();
+        }
+        return this;
+    }
+
+    /**
+   * Define el valor de anticipo o abono inicial.
+   */
+    conAnticipo(monto) {
+        const val = Number(monto);
+        this.#anticipo = Number.isFinite(val) && val >= 0 ? +val.toFixed(2) : 0.00;
+        return this;
+    }
+
+    /**
+   * Indica si la reservación corresponde a una prórroga de estancia.
+   */
+    conProrroga(bool) {
+        this.#esProrroga = Boolean(bool);
+        return this;
+    }
+
+    /**
+   * Registra notas u observaciones operativas de recepción.
+   */
+    conObservacionesRecepcion(texto) {
+        this.#observacionesRecepcion = texto !== undefined && texto !== null ? String(texto).trim() : null;
+        return this;
+    }
+
+    /**
    * Método de construcción final (build): valida la integridad de los datos
    * y retorna el payload normalizado para Sequelize.
    */
     build() {
         const errores = [];
 
-        if (!this.#usuarioId) errores.push('el usuario (huésped) es requerido');
+        const targetClienteId = this.#clienteId || this.#usuarioId;
+        if (!targetClienteId) errores.push('el cliente titular es requerido');
         if (!this.#habitacionId || String(this.#habitacionId).trim() === '') errores.push('la habitación es requerida');
 
         if (!this.#fechaInicio || !this.#fechaFin) {
@@ -157,6 +238,26 @@ export class ReservationBuilder {
             );
         }
 
+        const METODOS = new Set(['EFECTIVO', 'TRANSFERENCIA', 'TARJETA']);
+        const metodoFinal = (this.#metodoPago || 'EFECTIVO').toString().toUpperCase();
+        if (!METODOS.has(metodoFinal)) {
+            errores.push(
+                `método de pago inválido '${this.#metodoPago}'. Permitidos: ${[...METODOS].join(', ')}`
+            );
+        }
+
+        const TIPOS_RESERVA = new Set(['INMEDIATA', 'ANTICIPADA']);
+        const tipoReservaFinal = (this.#tipoReserva || 'ANTICIPADA').toString().toUpperCase();
+        if (!TIPOS_RESERVA.has(tipoReservaFinal)) {
+            errores.push(
+                `tipo de reserva inválido '${this.#tipoReserva}'. Permitidos: ${[...TIPOS_RESERVA].join(', ')}`
+            );
+        }
+
+        if (this.#anticipo < 0) {
+            errores.push('el anticipo no puede ser un valor negativo');
+        }
+
         if (errores.length > 0) {
             const msg = 'No se pudo construir la reservación: ' + errores.join('; ') + '.';
             throw new BadRequestError(msg);
@@ -167,23 +268,37 @@ export class ReservationBuilder {
 
         // Retorna el producto final formateado para el modelo
         return {
-            usuario_id:    this.#usuarioId,
-            habitacion_id: this.#habitacionId,
-            paquete_id:    this.#paqueteId,
-            fecha_inicio:  isoDate(this.#fechaInicio),
-            fecha_fin:     isoDate(this.#fechaFin),
-            precio_total:  +Number(this.#precioTotal).toFixed(2),
-            estado:        estadoFinal,
-            notas:         this.#notas,
+            cliente_id:              targetClienteId,
+            usuario_id:              this.#usuarioId,
+            acompanantes:            this.#acompanantes,
+            habitacion_id:           this.#habitacionId,
+            paquete_id:              this.#paqueteId,
+            fecha_inicio:            isoDate(this.#fechaInicio),
+            fecha_fin:               isoDate(this.#fechaFin),
+            precio_total:            +Number(this.#precioTotal).toFixed(2),
+            estado:                  estadoFinal,
+            metodo_pago:             metodoFinal,
+            tipo_reserva:            tipoReservaFinal,
+            es_prorroga:             this.#esProrroga,
+            anticipo:                +Number(this.#anticipo).toFixed(2),
+            observaciones_recepcion: this.#observacionesRecepcion,
+            notas:                   this.#notas,
         };
     }
 
     // Getters auxiliares para consulta durante la construcción
+    get clienteId() { return this.#clienteId; }
+    get acompanantes() { return this.#acompanantes; }
     get noches() { return this.#noches; }
     get subtotal() { return this.#subtotal; }
     get impuestos() { return this.#impuestos; }
     get precioTotal() { return this.#precioTotal; }
     get cotizacion() { return this.#cotizacion; }
+    get metodoPago() { return this.#metodoPago; }
+    get tipoReserva() { return this.#tipoReserva; }
+    get anticipo() { return this.#anticipo; }
+    get esProrroga() { return this.#esProrroga; }
+    get observacionesRecepcion() { return this.#observacionesRecepcion; }
 }
 
 export default ReservationBuilder;

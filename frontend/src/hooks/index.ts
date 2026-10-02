@@ -74,3 +74,18 @@ export type {
   UseDeleteUserOptions,
 } from './query/useUsers';
 export { usePackages, usePackage } from './query/usePackages';
+export {
+  useClientesPaginated,
+  useClienteDetail,
+  useCreateCliente,
+  useUpdateCliente,
+  useDeleteCliente,
+  useAddAcompanante,
+  useDeleteAcompanante,
+} from './query/useClientes';
+export type {
+  UseClientesPaginatedOptions,
+  UseCreateClienteOptions,
+  UseUpdateClienteOptions,
+  UseDeleteClienteOptions,
+} from './query/useClientes';

@@ -3,18 +3,12 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  Building2,
-  CalendarDays,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  User,
-  X,
-} from 'lucide-react';
+import { Building2, CalendarDays, LayoutDashboard, LogOut, Menu, User, X, Bed, Gift, ClipboardCheck } from 'lucide-react';
 import { cn, roleLabels } from '../lib/utils';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
+import { WhatsAppIcon } from './WhatsAppButton';
+import { buildWhatsAppUrl, buildGeneralWhatsAppMessage } from '../lib/whatsapp';
 import useAuth from '../hooks/useAuth';
 import { useToast } from './ui/Toast';
 
@@ -82,22 +76,41 @@ function Navbar() {
           <NavLink href="/">
             <CalendarDays className="h-4 w-4" /> Inicio
           </NavLink>
+          <NavLink href="/#habitaciones">
+            <Bed className="h-4 w-4" /> Habitaciones
+          </NavLink>
+          <NavLink href="/#paquetes">
+            <Gift className="h-4 w-4" /> Paquetes
+          </NavLink>
           {isAuthenticated ? (
-            <>
-              <NavLink
-                href={
-                  isRecepcionOrAdmin
-                    ? '/dashboard/admin'
-                    : '/dashboard/mis-reservas'
-                }
-              >
-                <LayoutDashboard className="h-4 w-4" /> Panel
+            user?.rol === 'ADMIN' ? (
+              <>
+                <NavLink href="/dashboard/recepcion">
+                  <ClipboardCheck className="h-4 w-4" /> Recepción
+                </NavLink>
+                <NavLink href="/dashboard/admin">
+                  <LayoutDashboard className="h-4 w-4" /> Inventario
+                </NavLink>
+              </>
+            ) : (
+              <NavLink href="/dashboard/recepcion">
+                <ClipboardCheck className="h-4 w-4" /> Recepción
               </NavLink>
-            </>
+            )
           ) : null}
         </div>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-3 md:flex">
+          <a
+            href={buildWhatsAppUrl(buildGeneralWhatsAppMessage())}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+          >
+            <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
+            <span>WhatsApp</span>
+          </a>
+
           {isAuthenticated && user ? (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 ring-1 ring-slate-200">
@@ -123,16 +136,11 @@ function Navbar() {
               </Button>
             </div>
           ) : (
-            <>
-              <Link href="/login">
-                <Button variant="ghost" size="sm">
-                  Iniciar sesión
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button size="sm">Crear cuenta</Button>
-              </Link>
-            </>
+            <Link href="/login">
+              <Button size="sm" variant="outline">
+                Acceso Personal
+              </Button>
+            </Link>
           )}
         </div>
 
@@ -156,20 +164,40 @@ function Navbar() {
             <NavLink href="/" onClick={() => setMobileOpen(false)}>
               <CalendarDays className="h-4 w-4" /> Inicio
             </NavLink>
+            <NavLink href="/#habitaciones" onClick={() => setMobileOpen(false)}>
+              <Bed className="h-4 w-4" /> Habitaciones
+            </NavLink>
+            <NavLink href="/#paquetes" onClick={() => setMobileOpen(false)}>
+              <Gift className="h-4 w-4" /> Paquetes
+            </NavLink>
             {isAuthenticated ? (
-              <>
-                <NavLink
-                  href={
-                    isRecepcionOrAdmin
-                      ? '/dashboard/admin'
-                      : '/dashboard/mis-reservas'
-                  }
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <LayoutDashboard className="h-4 w-4" /> Panel
+              user?.rol === 'ADMIN' ? (
+                <>
+                  <NavLink href="/dashboard/recepcion" onClick={() => setMobileOpen(false)}>
+                    <ClipboardCheck className="h-4 w-4" /> Recepción
+                  </NavLink>
+                  <NavLink href="/dashboard/admin" onClick={() => setMobileOpen(false)}>
+                    <LayoutDashboard className="h-4 w-4" /> Inventario
+                  </NavLink>
+                </>
+              ) : (
+                <NavLink href="/dashboard/recepcion" onClick={() => setMobileOpen(false)}>
+                  <ClipboardCheck className="h-4 w-4" /> Recepción
                 </NavLink>
-              </>
+              )
             ) : null}
+
+            <a
+              href={buildWhatsAppUrl(buildGeneralWhatsAppMessage())}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+            >
+              <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
+              <span>Chatear por WhatsApp</span>
+            </a>
+
             <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
               {isAuthenticated ? (
                 <>
@@ -198,16 +226,11 @@ function Navbar() {
                   </Button>
                 </>
               ) : (
-                <>
-                  <Link href="/login" onClick={() => setMobileOpen(false)}>
-                    <Button variant="outline" className="w-full">
-                      Iniciar sesión
-                    </Button>
-                  </Link>
-                  <Link href="/register" onClick={() => setMobileOpen(false)}>
-                    <Button className="w-full">Crear cuenta</Button>
-                  </Link>
-                </>
+                <Link href="/login" onClick={() => setMobileOpen(false)} className="col-span-2">
+                  <Button variant="outline" className="w-full">
+                    Acceso Personal (Recepción)
+                  </Button>
+                </Link>
               )}
             </div>
           </div>

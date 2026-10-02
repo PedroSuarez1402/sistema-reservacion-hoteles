@@ -13,34 +13,6 @@ const users = [
     password: 'Recepcion123',
     rol: 'RECEPCION',
   },
-  {
-    id: '00000000-0000-0000-0000-000000000003',
-    nombre: 'Juan Pérez',
-    email: 'juan.perez@example.com',
-    password: 'Huesped123',
-    rol: 'HUESPED',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000004',
-    nombre: 'Ana Gómez',
-    email: 'ana.gomez@example.com',
-    password: 'Huesped123',
-    rol: 'HUESPED',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000005',
-    nombre: 'Carlos Ruiz',
-    email: 'carlos.ruiz@example.com',
-    password: 'Huesped123',
-    rol: 'HUESPED',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000006',
-    nombre: 'Huésped Demo Hotel',
-    email: 'huesped@hotel.com',
-    password: 'Huesped123',
-    rol: 'HUESPED',
-  },
 ];
 
 export default users;
