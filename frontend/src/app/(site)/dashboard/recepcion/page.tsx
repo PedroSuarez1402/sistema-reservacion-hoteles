@@ -1,9 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Banknote,
+  Bed,
   Calendar,
   CheckCircle2,
   Clock,
@@ -130,34 +132,59 @@ export default function RecepcionDashboardPage() {
     ? Math.round((ocupadasHoyCount / activeRooms.length) * 100)
     : 0;
 
-  // Recaudación de hoy desglosada por método de pago
-  const recaudacionHoy = React.useMemo(() => {
-    let efectivo = 0;
-    let transferencia = 0;
-    let tarjeta = 0;
+  // Recaudación desglosada por método de pago (Total y Hoy)
+  const { recaudacionTotal, recaudacionHoy } = React.useMemo(() => {
+    const totalAcc = { efectivo: 0, transferencia: 0, tarjeta: 0, total: 0 };
+    const hoyAcc = { efectivo: 0, transferencia: 0, tarjeta: 0, total: 0 };
 
     for (const r of enrichedReservations) {
-      // Tomamos reservas registradas hoy o anticipos/totales cobrados
-      const createdDate = r.createdAt ? r.createdAt.substring(0, 10) : '';
-      const esHoy = createdDate === todayIso || r.fecha_inicio === todayIso;
+      if (r.estado === 'CANCELADA') continue;
 
-      if (esHoy && r.estado !== 'CANCELADA') {
-        const monto = Number(r.anticipo) > 0 ? Number(r.anticipo) : Number(r.precio_total);
-        if (r.metodo_pago === 'TRANSFERENCIA') {
-          transferencia += monto;
-        } else if (r.metodo_pago === 'TARJETA') {
-          tarjeta += monto;
+      const anticipoVal = Number(r.anticipo) || 0;
+      const totalVal = Number(r.precio_total) || 0;
+      // Monto cobrado: si tiene anticipo se toma el anticipo; si está confirmada o finalizada sin anticipo explícito, se toma el total
+      const monto = anticipoVal > 0 ? anticipoVal : (r.estado === 'CONFIRMADA' || r.estado === 'FINALIZADA' ? totalVal : 0);
+
+      if (monto > 0) {
+        const metodo = r.metodo_pago || 'EFECTIVO';
+        if (metodo === 'TRANSFERENCIA') {
+          totalAcc.transferencia += monto;
+        } else if (metodo === 'TARJETA') {
+          totalAcc.tarjeta += monto;
         } else {
-          efectivo += monto;
+          totalAcc.efectivo += monto;
+        }
+        totalAcc.total += monto;
+
+        // Validar si la reserva o cobro corresponde al día actual
+        const createdDate = r.createdAt ? r.createdAt.substring(0, 10) : '';
+        const esHoy = createdDate === todayIso || r.fecha_inicio === todayIso || r.fecha_fin === todayIso;
+        if (esHoy) {
+          if (metodo === 'TRANSFERENCIA') {
+            hoyAcc.transferencia += monto;
+          } else if (metodo === 'TARJETA') {
+            hoyAcc.tarjeta += monto;
+          } else {
+            hoyAcc.efectivo += monto;
+          }
+          hoyAcc.total += monto;
         }
       }
     }
 
     return {
-      efectivo,
-      transferencia,
-      tarjeta,
-      total: efectivo + transferencia + tarjeta,
+      recaudacionTotal: {
+        efectivo: +totalAcc.efectivo.toFixed(2),
+        transferencia: +totalAcc.transferencia.toFixed(2),
+        tarjeta: +totalAcc.tarjeta.toFixed(2),
+        total: +totalAcc.total.toFixed(2),
+      },
+      recaudacionHoy: {
+        efectivo: +hoyAcc.efectivo.toFixed(2),
+        transferencia: +hoyAcc.transferencia.toFixed(2),
+        tarjeta: +hoyAcc.tarjeta.toFixed(2),
+        total: +hoyAcc.total.toFixed(2),
+      },
     };
   }, [enrichedReservations, todayIso]);
 
@@ -331,43 +358,47 @@ export default function RecepcionDashboardPage() {
           </p>
         </div>
 
-        <Button
-          size="lg"
-          onClick={() => setAssistedBookingOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 font-semibold"
-          leftIcon={<Plus className="h-5 w-5" />}
-        >
-          Registrar Reserva
-        </Button>
+        <div className="flex items-center gap-2.5">
+          <Button
+            size="lg"
+            onClick={() => setAssistedBookingOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 font-semibold"
+            leftIcon={<Plus className="h-5 w-5" />}
+          >
+            Registrar Reserva
+          </Button>
+        </div>
       </div>
 
       {/* Métricas del Día (KPI Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI: Habitaciones Libres vs Ocupadas */}
-        <Card className="border border-slate-200 bg-white">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Ocupación Hoy
-              </span>
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
-                <Hotel className="h-4 w-4" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-slate-900">{ocupadasHoyCount}</span>
-              <span className="text-xs text-slate-500">
-                / {activeRooms.length} habitaciones ({porcentajeOcupacion}%)
-              </span>
-            </div>
-            <div className="mt-2 flex items-center gap-2 text-xs font-medium text-emerald-600">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              <span>{libresHoyCount} habitaciones libres para hoy</span>
-            </div>
-          </CardContent>
-        </Card>
+        <Link href="/dashboard/habitaciones" className="block group">
+          <Card className="border border-slate-200 bg-white group-hover:border-primary-300 transition-all h-full">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 group-hover:text-primary-700 transition-colors">
+                  Ocupación Hoy (Ver Rack →)
+                </span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100 transition-colors">
+                  <Hotel className="h-4 w-4" />
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-slate-900">{ocupadasHoyCount}</span>
+                <span className="text-xs text-slate-500">
+                  / {activeRooms.length} habitaciones ({porcentajeOcupacion}%)
+                </span>
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-xs font-medium text-emerald-600">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span>{libresHoyCount} habitaciones libres para hoy</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {/* KPI: Recaudado Hoy en Efectivo */}
+        {/* KPI: Recaudado en Efectivo */}
         <Card className="border border-slate-200 bg-white">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
@@ -380,14 +411,16 @@ export default function RecepcionDashboardPage() {
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-emerald-700">
-                {formatCurrency(recaudacionHoy.efectivo)}
+                {formatCurrency(recaudacionTotal.efectivo)}
               </span>
             </div>
-            <p className="mt-2 text-xs text-slate-400">Cobros físicos en mostrador hoy</p>
+            <p className="mt-2 text-xs text-slate-400">
+              {recaudacionHoy.efectivo > 0 ? `Hoy: ${formatCurrency(recaudacionHoy.efectivo)}` : 'Cobros físicos en mostrador'}
+            </p>
           </CardContent>
         </Card>
 
-        {/* KPI: Recaudado Hoy en Transferencia */}
+        {/* KPI: Recaudado en Transferencia */}
         <Card className="border border-slate-200 bg-white">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
@@ -400,19 +433,21 @@ export default function RecepcionDashboardPage() {
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-purple-700">
-                {formatCurrency(recaudacionHoy.transferencia)}
+                {formatCurrency(recaudacionTotal.transferencia)}
               </span>
             </div>
-            <p className="mt-2 text-xs text-slate-400">Transferencias / WhatsApp hoy</p>
+            <p className="mt-2 text-xs text-slate-400">
+              {recaudacionHoy.transferencia > 0 ? `Hoy: ${formatCurrency(recaudacionHoy.transferencia)}` : 'Nequi / Daviplata / Bancos'}
+            </p>
           </CardContent>
         </Card>
 
-        {/* KPI: Total Recaudado Hoy */}
+        {/* KPI: Total Recaudado */}
         <Card className="border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-800 text-white">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                Total Recaudado Hoy
+                Total Recaudado
               </span>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-emerald-400">
                 <DollarSign className="h-4 w-4" />
@@ -420,12 +455,15 @@ export default function RecepcionDashboardPage() {
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-emerald-400">
-                {formatCurrency(recaudacionHoy.total)}
+                {formatCurrency(recaudacionTotal.total)}
               </span>
             </div>
-            <p className="mt-2 text-xs text-slate-300">
-              Tarjeta: {formatCurrency(recaudacionHoy.tarjeta)}
-            </p>
+            <div className="mt-2 flex items-center justify-between text-xs text-slate-300">
+              <span>Tarjeta: {formatCurrency(recaudacionTotal.tarjeta)}</span>
+              {recaudacionHoy.total > 0 && (
+                <span className="text-emerald-400 font-medium">Hoy: {formatCurrency(recaudacionHoy.total)}</span>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -458,8 +496,8 @@ export default function RecepcionDashboardPage() {
                 type="button"
                 onClick={() => setStatusFilter(tab.id)}
                 className={`px-2.5 py-1.5 rounded-md transition-colors ${statusFilter === tab.id
-                    ? 'bg-white text-slate-900 shadow-sm font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-slate-900 shadow-sm font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 {tab.label}
@@ -606,10 +644,10 @@ export default function RecepcionDashboardPage() {
                         <div className="flex items-center gap-1">
                           <Badge
                             className={`text-[10px] px-1.5 py-0 ${r.metodo_pago === 'TRANSFERENCIA'
-                                ? 'bg-purple-100 text-purple-700'
-                                : r.metodo_pago === 'TARJETA'
-                                  ? 'bg-blue-100 text-blue-700'
-                                  : 'bg-emerald-100 text-emerald-700'
+                              ? 'bg-purple-100 text-purple-700'
+                              : r.metodo_pago === 'TARJETA'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-emerald-100 text-emerald-700'
                               }`}
                           >
                             {r.metodo_pago || 'EFECTIVO'}

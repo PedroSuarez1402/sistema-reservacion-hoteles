@@ -194,6 +194,7 @@ export default function ClientesPage() {
             telefono: payload.telefono,
             direccion: payload.direccion,
             observaciones: payload.observaciones,
+            acompanantes: payload.acompanantes as any,
           },
         });
         toast.success(

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Building2, CalendarDays, LayoutDashboard, LogOut, Menu, User, X, Bed, Gift, ClipboardCheck } from 'lucide-react';
+import { Building2, CalendarDays, LayoutDashboard, LogOut, Menu, User, X, Bed, Gift, ClipboardCheck, Users } from 'lucide-react';
 import { cn, roleLabels } from '../lib/utils';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -42,9 +42,16 @@ function NavLink({
 
 function Navbar() {
   const router = useRouter();
-  const { isAuthenticated, user, logout, isRecepcionOrAdmin } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const toast = useToast();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  const isStaff = Boolean(isAuthenticated && (user?.rol === 'RECEPCION' || user?.rol === 'ADMIN'));
+  const homeHref = isStaff
+    ? user?.rol === 'ADMIN'
+      ? '/dashboard/admin'
+      : '/dashboard/recepcion'
+    : '/';
 
   function handleLogout() {
     logout();
@@ -60,7 +67,7 @@ function Navbar() {
       >
         <div className="flex items-center gap-2">
           <Link
-            href="/"
+            href={homeHref}
             className="flex items-center gap-2 rounded-lg px-1 py-1 text-slate-900 hover:bg-slate-100"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 text-white shadow-sm shadow-primary-600/30">
@@ -72,44 +79,50 @@ function Navbar() {
           </Link>
         </div>
 
+        {/* Enlaces de navegación principales */}
         <div className="hidden items-center gap-1 md:flex">
-          <NavLink href="/">
-            <CalendarDays className="h-4 w-4" /> Inicio
-          </NavLink>
-          <NavLink href="/#habitaciones">
-            <Bed className="h-4 w-4" /> Habitaciones
-          </NavLink>
-          <NavLink href="/#paquetes">
-            <Gift className="h-4 w-4" /> Paquetes
-          </NavLink>
-          {isAuthenticated ? (
-            user?.rol === 'ADMIN' ? (
-              <>
-                <NavLink href="/dashboard/recepcion">
-                  <ClipboardCheck className="h-4 w-4" /> Recepción
-                </NavLink>
-                <NavLink href="/dashboard/admin">
-                  <LayoutDashboard className="h-4 w-4" /> Inventario
-                </NavLink>
-              </>
-            ) : (
+          {isStaff ? (
+            <>
               <NavLink href="/dashboard/recepcion">
                 <ClipboardCheck className="h-4 w-4" /> Recepción
               </NavLink>
-            )
-          ) : null}
+              <NavLink href="/dashboard/habitaciones">
+                <Bed className="h-4 w-4" /> Habitaciones
+              </NavLink>
+              {user?.rol === 'ADMIN' && (
+                <NavLink href="/dashboard/admin">
+                  <LayoutDashboard className="h-4 w-4" /> Inventario
+                </NavLink>
+              )}
+            </>
+          ) : (
+            <>
+              <NavLink href="/">
+                <CalendarDays className="h-4 w-4" /> Inicio
+              </NavLink>
+              <NavLink href="/#habitaciones">
+                <Bed className="h-4 w-4" /> Habitaciones
+              </NavLink>
+              <NavLink href="/#paquetes">
+                <Gift className="h-4 w-4" /> Paquetes
+              </NavLink>
+            </>
+          )}
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          <a
-            href={buildWhatsAppUrl(buildGeneralWhatsAppMessage())}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
-          >
-            <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
-            <span>WhatsApp</span>
-          </a>
+          {/* Botón WhatsApp solo visible para visitantes públicos */}
+          {!isStaff && (
+            <a
+              href={buildWhatsAppUrl(buildGeneralWhatsAppMessage())}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+            >
+              <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
+              <span>WhatsApp</span>
+            </a>
+          )}
 
           {isAuthenticated && user ? (
             <div className="flex items-center gap-3">
@@ -161,42 +174,43 @@ function Navbar() {
       {mobileOpen ? (
         <div className="md:hidden">
           <div className="space-y-1 border-t border-slate-200 bg-white px-4 py-3 shadow-inner">
-            <NavLink href="/" onClick={() => setMobileOpen(false)}>
-              <CalendarDays className="h-4 w-4" /> Inicio
-            </NavLink>
-            <NavLink href="/#habitaciones" onClick={() => setMobileOpen(false)}>
-              <Bed className="h-4 w-4" /> Habitaciones
-            </NavLink>
-            <NavLink href="/#paquetes" onClick={() => setMobileOpen(false)}>
-              <Gift className="h-4 w-4" /> Paquetes
-            </NavLink>
-            {isAuthenticated ? (
-              user?.rol === 'ADMIN' ? (
-                <>
-                  <NavLink href="/dashboard/recepcion" onClick={() => setMobileOpen(false)}>
-                    <ClipboardCheck className="h-4 w-4" /> Recepción
-                  </NavLink>
-                  <NavLink href="/dashboard/admin" onClick={() => setMobileOpen(false)}>
-                    <LayoutDashboard className="h-4 w-4" /> Inventario
-                  </NavLink>
-                </>
-              ) : (
+            {isStaff ? (
+              <>
                 <NavLink href="/dashboard/recepcion" onClick={() => setMobileOpen(false)}>
                   <ClipboardCheck className="h-4 w-4" /> Recepción
                 </NavLink>
-              )
-            ) : null}
-
-            <a
-              href={buildWhatsAppUrl(buildGeneralWhatsAppMessage())}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
-            >
-              <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
-              <span>Chatear por WhatsApp</span>
-            </a>
+                <NavLink href="/dashboard/habitaciones" onClick={() => setMobileOpen(false)}>
+                  <Bed className="h-4 w-4" /> Habitaciones
+                </NavLink>
+                {user?.rol === 'ADMIN' && (
+                  <NavLink href="/dashboard/admin" onClick={() => setMobileOpen(false)}>
+                    <LayoutDashboard className="h-4 w-4" /> Inventario
+                  </NavLink>
+                )}
+              </>
+            ) : (
+              <>
+                <NavLink href="/" onClick={() => setMobileOpen(false)}>
+                  <CalendarDays className="h-4 w-4" /> Inicio
+                </NavLink>
+                <NavLink href="/#habitaciones" onClick={() => setMobileOpen(false)}>
+                  <Bed className="h-4 w-4" /> Habitaciones
+                </NavLink>
+                <NavLink href="/#paquetes" onClick={() => setMobileOpen(false)}>
+                  <Gift className="h-4 w-4" /> Paquetes
+                </NavLink>
+                <a
+                  href={buildWhatsAppUrl(buildGeneralWhatsAppMessage())}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                >
+                  <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
+                  <span>Chatear por WhatsApp</span>
+                </a>
+              </>
+            )}
 
             <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
               {isAuthenticated ? (

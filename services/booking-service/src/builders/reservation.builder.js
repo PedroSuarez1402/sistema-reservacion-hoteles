@@ -60,18 +60,36 @@ export class ReservationBuilder {
     }
 
     /**
-   * Asocia la lista de acompañantes registrados para esta estancia.
+   * Asocia la lista de acompañantes registrados para esta estancia (con deduplicación).
    */
     conAcompanantes(lista) {
         if (Array.isArray(lista)) {
-            this.#acompanantes = lista
-                .filter(a => a && a.nombre && String(a.nombre).trim().length > 0)
-                .map(a => ({
-                    nombre: String(a.nombre).trim(),
-                    documento: a.documento ? String(a.documento).trim() : null,
+            const seenDocs = new Set();
+            const seenNames = new Set();
+            const cleanList = [];
+
+            for (const a of lista) {
+                if (!a || !a.nombre || String(a.nombre).trim().length === 0) continue;
+                const nombre = String(a.nombre).trim();
+                const doc = a.documento ? String(a.documento).trim() : null;
+                const nameKey = nombre.toLowerCase();
+                const docKey = doc ? doc.toLowerCase() : null;
+
+                // Evitar duplicados dentro de la lista
+                if (docKey && seenDocs.has(docKey)) continue;
+                if (seenNames.has(nameKey)) continue;
+
+                if (docKey) seenDocs.add(docKey);
+                seenNames.add(nameKey);
+
+                cleanList.push({
+                    nombre,
+                    documento: doc,
                     parentesco: a.parentesco ? String(a.parentesco).trim() : 'Familiar',
                     telefono: a.telefono ? String(a.telefono).trim() : null,
-                }));
+                });
+            }
+            this.#acompanantes = cleanList;
         }
         return this;
     }

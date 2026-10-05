@@ -17,27 +17,88 @@ const acompananteSchema = z.object({
   telefono: z.string().optional(),
 });
 
-const clienteFormSchema = z.object({
-  documento: z
-    .string()
-    .min(3, 'El documento debe tener al menos 3 caracteres')
-    .max(50, 'El documento no puede exceder 50 caracteres')
-    .trim(),
-  nombre: z
-    .string()
-    .min(2, 'El nombre debe tener al menos 2 caracteres')
-    .max(120, 'El nombre no puede exceder 120 caracteres')
-    .trim(),
-  email: z
-    .string()
-    .email('Ingresa un correo electrónico válido')
-    .max(150, 'El email no puede exceder 150 caracteres')
-    .trim(),
-  telefono: z.string().max(30).optional().or(z.literal('')),
-  direccion: z.string().max(255).optional().or(z.literal('')),
-  observaciones: z.string().max(500).optional().or(z.literal('')),
-  acompanantes: z.array(acompananteSchema).optional(),
-});
+const clienteFormSchema = z
+  .object({
+    documento: z
+      .string()
+      .min(3, 'El documento debe tener al menos 3 caracteres')
+      .max(50, 'El documento no puede exceder 50 caracteres')
+      .trim(),
+    nombre: z
+      .string()
+      .min(2, 'El nombre debe tener al menos 2 caracteres')
+      .max(120, 'El nombre no puede exceder 120 caracteres')
+      .trim(),
+    email: z
+      .string()
+      .email('Ingresa un correo electrónico válido')
+      .max(150, 'El email no puede exceder 150 caracteres')
+      .trim(),
+    telefono: z.string().max(30).optional().or(z.literal('')),
+    direccion: z.string().max(255).optional().or(z.literal('')),
+    observaciones: z.string().max(500).optional().or(z.literal('')),
+    acompanantes: z.array(acompananteSchema).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.acompanantes || data.acompanantes.length === 0) return;
+
+    const titularDoc = data.documento.trim().toLowerCase();
+    const titularNombre = data.nombre.trim().toLowerCase();
+
+    const seenDocs = new Map<string, number>();
+    const seenNames = new Map<string, number>();
+
+    data.acompanantes.forEach((acomp, idx) => {
+      const cleanDoc = acomp.documento?.trim().toLowerCase();
+      const cleanName = acomp.nombre?.trim().toLowerCase();
+
+      // 1. Validar que el acompañante no sea el mismo cliente titular por documento
+      if (cleanDoc && titularDoc && cleanDoc === titularDoc) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['acompanantes', idx, 'documento'],
+          message: 'El documento no puede ser igual al del cliente titular',
+        });
+      }
+
+      // 2. Validar que el acompañante no sea el mismo cliente titular por nombre
+      if (cleanName && titularNombre && cleanName === titularNombre) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['acompanantes', idx, 'nombre'],
+          message: 'El acompañante no puede ser el mismo cliente titular',
+        });
+      }
+
+      // 3. Validar duplicados entre acompañantes por documento
+      if (cleanDoc) {
+        if (seenDocs.has(cleanDoc)) {
+          const firstIdx = seenDocs.get(cleanDoc)!;
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['acompanantes', idx, 'documento'],
+            message: `Documento repetido con el Acompañante #${firstIdx + 1}`,
+          });
+        } else {
+          seenDocs.set(cleanDoc, idx);
+        }
+      }
+
+      // 4. Validar duplicados entre acompañantes por nombre
+      if (cleanName) {
+        if (seenNames.has(cleanName)) {
+          const firstIdx = seenNames.get(cleanName)!;
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['acompanantes', idx, 'nombre'],
+            message: `Nombre repetido con el Acompañante #${firstIdx + 1}`,
+          });
+        } else {
+          seenNames.set(cleanName, idx);
+        }
+      }
+    });
+  });
 
 export type ClienteFormValues = z.infer<typeof clienteFormSchema>;
 
@@ -296,6 +357,7 @@ function ClienteModal({
                     <Input
                       label="Documento"
                       placeholder="Doc / ID"
+                      error={errors.acompanantes?.[idx]?.documento?.message}
                       {...register(`acompanantes.${idx}.documento` as const)}
                     />
                     <Input

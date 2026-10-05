@@ -38,7 +38,7 @@ import {
   getTomorrowIso,
   roomTypeLabels,
 } from '../lib/utils';
-import { usePackages, useRooms } from '../hooks';
+import { useAllReservations, usePackages, useRooms } from '../hooks';
 import clienteService from '../services/cliente.service';
 import reservationService from '../services/reservation.service';
 import type {
@@ -74,6 +74,7 @@ export function RecepcionBookingModal({
 
   const { data: allRooms = [], isLoading: roomsLoading } = useRooms();
   const { data: allPackages = [], isLoading: packagesLoading } = usePackages();
+  const { data: allReservations = [], isLoading: reservationsLoading } = useAllReservations();
 
   // Submission state
   const [submitting, setSubmitting] = React.useState(false);
@@ -130,17 +131,6 @@ export function RecepcionBookingModal({
     return () => clearTimeout(timer);
   }, [searchQuery, modoCliente, selectedCliente]);
 
-  // Initial room selection on open
-  React.useEffect(() => {
-    if (open) {
-      if (preselectedRoom) {
-        setHabitacionId(preselectedRoom.id);
-      } else if (!habitacionId && allRooms.length > 0) {
-        const firstActive = allRooms.find((r) => r.estado === 'ACTIVA');
-        if (firstActive) setHabitacionId(firstActive.id);
-      }
-    }
-  }, [open, preselectedRoom, allRooms, habitacionId]);
 
   // Handle selecting an existing client
   function handleSelectCliente(cliente: Cliente) {
@@ -238,10 +228,53 @@ export function RecepcionBookingModal({
     }
   }
 
-  // Active rooms only
-  const activeRooms = React.useMemo(() => {
-    return allRooms.filter((r) => r.estado === 'ACTIVA');
-  }, [allRooms]);
+  // Filtrar habitaciones activas estrictamente disponibles en el rango [fechaInicio, fechaFin)
+  // Condición de solapamiento hotelero: res.fecha_inicio < reqEnd && res.fecha_fin > reqStart
+  // Si una reserva previa finaliza el mismo día de llegada (res.fecha_fin <= reqStart), NO hay solapamiento (turnaround)
+  const availableRooms = React.useMemo(() => {
+    const active = allRooms.filter((r) => r.estado === 'ACTIVA');
+    if (!fechaInicio || !fechaFin || fechaFin <= fechaInicio) {
+      return active;
+    }
+
+    const reqStart = fechaInicio.slice(0, 10);
+    const reqEnd = fechaFin.slice(0, 10);
+
+    const occupiedRoomIds = new Set<string>();
+
+    for (const res of allReservations) {
+      if (res.estado === 'CANCELADA' || res.estado === 'FINALIZADA') continue;
+      if (!res.habitacion_id || !res.fecha_inicio || !res.fecha_fin) continue;
+
+      const resStart = res.fecha_inicio.slice(0, 10);
+      const resEnd = res.fecha_fin.slice(0, 10);
+
+      if (resStart < reqEnd && resEnd > reqStart) {
+        occupiedRoomIds.add(res.habitacion_id);
+      }
+    }
+
+    return active.filter((r) => !occupiedRoomIds.has(r.id));
+  }, [allRooms, allReservations, fechaInicio, fechaFin]);
+
+  // Sincronización de habitación seleccionada según disponibilidad en las fechas
+  React.useEffect(() => {
+    if (!open) return;
+
+    if (preselectedRoom && availableRooms.some((r) => r.id === preselectedRoom.id)) {
+      setHabitacionId(preselectedRoom.id);
+      return;
+    }
+
+    if (habitacionId) {
+      const isStillAvailable = availableRooms.some((r) => r.id === habitacionId);
+      if (!isStillAvailable) {
+        setHabitacionId(availableRooms.length > 0 ? availableRooms[0].id : '');
+      }
+    } else if (availableRooms.length > 0) {
+      setHabitacionId(availableRooms[0].id);
+    }
+  }, [open, availableRooms, habitacionId, preselectedRoom]);
 
   const selectedRoom = React.useMemo(() => {
     return allRooms.find((r) => r.id === habitacionId) || null;
@@ -339,6 +372,41 @@ export function RecepcionBookingModal({
           }))
       : [];
 
+    // Validar que no haya acompañantes repetidos
+    if (tieneAcompanantes && validAcompanantes.length > 0) {
+      const titularDoc = documento.trim().toLowerCase();
+      const titularNom = nombre.trim().toLowerCase();
+      const seenDocs = new Set<string>();
+      const seenNoms = new Set<string>();
+
+      for (let i = 0; i < validAcompanantes.length; i++) {
+        const ac = validAcompanantes[i];
+        const acDoc = ac.documento?.trim().toLowerCase();
+        const acNom = ac.nombre.trim().toLowerCase();
+
+        if (acDoc && titularDoc && acDoc === titularDoc) {
+          toast.warning('Acompañante inválido', `El documento del acompañante coincide con el documento del cliente titular`);
+          return;
+        }
+        if (acNom === titularNom) {
+          toast.warning('Acompañante inválido', `El acompañante "${ac.nombre}" no puede ser el mismo cliente titular`);
+          return;
+        }
+        if (acDoc) {
+          if (seenDocs.has(acDoc)) {
+            toast.warning('Acompañante duplicado', `El documento "${ac.documento}" está repetido entre los acompañantes`);
+            return;
+          }
+          seenDocs.add(acDoc);
+        }
+        if (seenNoms.has(acNom)) {
+          toast.warning('Acompañante duplicado', `El acompañante "${ac.nombre}" está registrado más de una vez`);
+          return;
+        }
+        seenNoms.add(acNom);
+      }
+    }
+
     setSubmitting(true);
     try {
       // 1. Componer observaciones operativas de recepción
@@ -410,15 +478,15 @@ export function RecepcionBookingModal({
     }
   }
 
-  // Room select options
+  // Room select options (solo habitaciones disponibles para las fechas solicitadas)
   const roomOptions: SelectOption[] = React.useMemo(() => {
-    return activeRooms.map((r) => ({
+    return availableRooms.map((r) => ({
       value: r.id,
       label: `Habitación ${r.numero} — ${roomTypeLabels[r.tipo] || r.tipo} (${formatCurrency(
         Number(r.precio_noche)
       )}/noche)`,
     }));
-  }, [activeRooms]);
+  }, [availableRooms]);
 
   // Package select options
   const packageOptions: SelectOption[] = React.useMemo(() => {
@@ -845,15 +913,31 @@ export function RecepcionBookingModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-700">Habitación *</label>
-              {roomsLoading ? (
+              {roomsLoading || reservationsLoading ? (
                 <div className="h-10 animate-pulse bg-slate-100 rounded-lg" />
               ) : (
-                <Select
-                  options={roomOptions}
-                  value={habitacionId}
-                  onChange={(e) => setHabitacionId(e.target.value)}
-                  placeholder="Selecciona una habitación activa"
-                />
+                <>
+                  <Select
+                    options={roomOptions}
+                    value={habitacionId}
+                    onChange={(e) => setHabitacionId(e.target.value)}
+                    placeholder={
+                      availableRooms.length === 0
+                        ? 'No hay habitaciones disponibles para estas fechas'
+                        : 'Selecciona una habitación disponible'
+                    }
+                    disabled={availableRooms.length === 0}
+                  />
+                  {availableRooms.length === 0 ? (
+                    <p className="text-[11px] text-rose-600 font-medium mt-1">
+                      ⚠️ No hay habitaciones disponibles del {fechaInicio} al {fechaFin}. Modifica las fechas.
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-emerald-600 font-medium mt-1">
+                      ✓ {availableRooms.length} habitación{availableRooms.length === 1 ? '' : 'es'} disponible{availableRooms.length === 1 ? '' : 's'} en estas fechas.
+                    </p>
+                  )}
+                </>
               )}
             </div>
 

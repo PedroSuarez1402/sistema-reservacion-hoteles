@@ -103,6 +103,10 @@ export const roomStatusStyles: Record<
     className:
       'bg-emerald-100 text-emerald-800 border border-emerald-200',
   },
+  LIMPIEZA: {
+    label: 'En Limpieza',
+    className: 'bg-sky-100 text-sky-800 border border-sky-200',
+  },
   MANTENIMIENTO: {
     label: 'Mantenimiento',
     className: 'bg-amber-100 text-amber-800 border border-amber-200',

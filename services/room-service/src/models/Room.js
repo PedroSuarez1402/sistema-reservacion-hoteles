@@ -25,7 +25,7 @@ Room.init(
       allowNull: false,
     },
     estado: {
-      type: DataTypes.ENUM('ACTIVA', 'MANTENIMIENTO', 'ELIMINADA'),
+      type: DataTypes.ENUM('ACTIVA', 'MANTENIMIENTO', 'LIMPIEZA', 'ELIMINADA'),
       defaultValue: 'ACTIVA',
       allowNull: false,
     },

@@ -559,3 +559,28 @@ export function useDeleteRoomImage(options: UseDeleteRoomImageOptions = {}) {
   });
 }
 
+export function useUpdateRoomStatus() {
+  const queryClient = useQueryClient();
+  const listKey = queryKeys.rooms.lists();
+
+  return useMutation<
+    Room,
+    ApiErrorResponse,
+    { id: string; estado: Room['estado'] },
+    unknown
+  >({
+    mutationKey: ['rooms', 'updateStatus'],
+    mutationFn: ({ id, estado }) => roomService.updateStatus(id, estado),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.rooms.detail(variables.id),
+      });
+      await queryClient.invalidateQueries({ queryKey: listKey });
+      await queryClient.invalidateQueries({ queryKey: ['reservations'] });
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: listKey });
+    },
+  });
+}
+

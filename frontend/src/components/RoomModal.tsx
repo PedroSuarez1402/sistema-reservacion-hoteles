@@ -23,6 +23,7 @@ const roomTypeOptions: SelectOption[] = [
 
 const roomStatusOptions: SelectOption[] = [
   { value: 'ACTIVA', label: 'Activa' },
+  { value: 'LIMPIEZA', label: 'Limpieza' },
   { value: 'MANTENIMIENTO', label: 'Mantenimiento' },
   { value: 'ELIMINADA', label: 'Eliminada' },
 ];
@@ -35,7 +36,7 @@ const createRoomSchema = z.object({
   precio_noche: z.coerce
     .number({ required_error: 'Precio por noche es requerido' })
     .positive('El precio debe ser mayor a 0'),
-  estado: z.enum(['ACTIVA', 'MANTENIMIENTO', 'ELIMINADA'], {
+  estado: z.enum(['ACTIVA', 'LIMPIEZA', 'MANTENIMIENTO', 'ELIMINADA'], {
     required_error: 'Selecciona un estado',
   }),
   descripcion: z

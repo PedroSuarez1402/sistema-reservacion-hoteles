@@ -154,6 +154,18 @@ class RoomService {
     return await RoomRepository.getById(id);
   }
 
+  static async updateStatus(id, estado) {
+    assertRequired(id, 'El ID de la habitación es requerido');
+    assertRequired(estado, 'El estado es requerido');
+    const validEstados = ['ACTIVA', 'MANTENIMIENTO', 'LIMPIEZA'];
+    if (!validEstados.includes(estado)) {
+      throw new BadRequestError(`Estado inválido. Debe ser uno de: ${validEstados.join(', ')}`);
+    }
+    await this.getById(id);
+    await RoomRepository.update(id, { estado });
+    return await RoomRepository.getById(id);
+  }
+
   static async delete(id) {
     await this.getById(id);
     return await RoomRepository.delete(id);

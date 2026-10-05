@@ -25,7 +25,7 @@ async function bootstrap() {
       process.exit(1);
     }
 
-    await sequelize.sync({ alter: false });
+    await sequelize.sync({ alter: true });
     console.log('✅ Modelos Room sincronizados correctamente.');
 
     const server = http.createServer(app);

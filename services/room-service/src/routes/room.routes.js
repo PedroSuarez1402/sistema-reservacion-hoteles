@@ -11,6 +11,7 @@ router.get('/available', RoomController.getAvailable);
 router.post('/', verifyToken, isAdmin, RoomController.create);
 router.get('/:id', RoomController.getById);
 router.put('/:id', verifyToken, isAdmin, RoomController.update);
+router.patch('/:id/status', verifyToken, isRecepcionOrAdmin, RoomController.updateStatus);
 router.delete('/:id', verifyToken, isAdmin, RoomController.remove);
 
 router.post(

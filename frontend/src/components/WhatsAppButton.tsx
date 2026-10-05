@@ -8,6 +8,7 @@ import {
   DEFAULT_RECEPTION_WHATSAPP,
 } from '../lib/whatsapp';
 import { cn } from '../lib/utils';
+import useAuth from '../hooks/useAuth';
 
 export interface WhatsAppButtonProps {
   phone?: string;
@@ -50,7 +51,13 @@ export function WhatsAppButton({
   tooltipText = '¿Tienes dudas? ¡Escríbenos a WhatsApp!',
   size = 'md',
 }: WhatsAppButtonProps) {
+  const { isAuthenticated, user } = useAuth();
   const [isHovered, setIsHovered] = React.useState(false);
+
+  // Ocultar botón de WhatsApp para personal administrativo / recepción autenticado
+  if (isAuthenticated && (user?.rol === 'RECEPCION' || user?.rol === 'ADMIN')) {
+    return null;
+  }
 
   const defaultMsg = message || buildGeneralWhatsAppMessage();
   const url = buildWhatsAppUrl(defaultMsg, phone);

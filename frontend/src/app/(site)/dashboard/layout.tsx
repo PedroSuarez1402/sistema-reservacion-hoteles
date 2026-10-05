@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Hotel, Users, ClipboardCheck, LayoutDashboard } from 'lucide-react';
+import { Bed, Hotel, Users, ClipboardCheck, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import useAuth from '@/hooks/useAuth';
 import type { UserRole } from '@/types';
@@ -25,6 +25,12 @@ function DashboardSidebar() {
         href: '/dashboard/recepcion',
         label: 'Consola Recepción',
         icon: <ClipboardCheck className="h-4 w-4" />,
+        roles: ['ADMIN', 'RECEPCION'],
+      },
+      {
+        href: '/dashboard/habitaciones',
+        label: 'Rack Habitaciones',
+        icon: <Bed className="h-4 w-4" />,
         roles: ['ADMIN', 'RECEPCION'],
       },
       {

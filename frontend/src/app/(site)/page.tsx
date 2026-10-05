@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { Calendar as CalendarIcon, Search as SearchIcon, Sparkles, CheckCircle2, Gift, PhoneCall } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,7 +9,7 @@ import { z } from 'zod';
 import { Badge, Button, Card, CardContent, Dialog, ImageCarousel, Input, RoomCard, useToast, WhatsAppIcon, } from '@/components';
 import { cn, calculateNights, enrichRoomWithMedia, formatCurrency, formatDate, getTodayIso, getTomorrowIso, roomTypeLabels, } from '@/lib/utils';
 import { buildWhatsAppUrl, buildRoomWhatsAppMessage, buildPackageWhatsAppMessage, buildGeneralWhatsAppMessage, DEFAULT_RECEPTION_WHATSAPP, } from '@/lib/whatsapp';
-import { useAvailableRooms, usePackages, useRooms, } from '@/hooks';
+import { useAuth, useAvailableRooms, usePackages, useRooms, } from '@/hooks';
 import type { ApiErrorResponse, Room, Paquete } from '@/types';
 
 const searchSchema = z
@@ -24,7 +25,20 @@ const searchSchema = z
 type SearchFormValues = z.infer<typeof searchSchema>;
 
 function HomePage() {
+  const router = useRouter();
+  const { isAuthenticated, user } = useAuth();
   const toast = useToast();
+
+  // Si el usuario es recepcionista o admin, redirigir inmediatamente a la consola operativa
+  React.useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.rol === 'RECEPCION') {
+        router.replace('/dashboard/recepcion');
+      } else if (user.rol === 'ADMIN') {
+        router.replace('/dashboard/admin');
+      }
+    }
+  }, [isAuthenticated, user, router]);
 
   const { data: paquetes = [], isLoading: paquetesLoading } = usePackages();
   const [detailRoom, setDetailRoom] = React.useState<Room | null>(null);
@@ -107,6 +121,15 @@ function HomePage() {
   }
 
   const receptionPhone = process.env.NEXT_PUBLIC_RECEPTION_WHATSAPP || DEFAULT_RECEPTION_WHATSAPP;
+
+  // Si es personal staff, no renderizar la landing page mientras se ejecuta la redirección
+  if (isAuthenticated && (user?.rol === 'RECEPCION' || user?.rol === 'ADMIN')) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-16">

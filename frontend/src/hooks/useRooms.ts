@@ -4,6 +4,7 @@ export {
   useAvailableRooms,
   useCreateRoom,
   useUpdateRoom,
+  useUpdateRoomStatus,
   useDeleteRoom,
   useUploadRoomImages,
   useReorderRoomImages,

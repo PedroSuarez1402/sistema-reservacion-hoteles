@@ -15,6 +15,7 @@ interface RoomService {
   getAvailable: (params: RoomAvailabilityParams) => Promise<Room[]>;
   create: (payload: CreateRoomPayload) => Promise<Room>;
   update: (id: string, payload: UpdateRoomPayload) => Promise<Room>;
+  updateStatus: (id: string, estado: Room['estado']) => Promise<Room>;
   remove: (id: string) => Promise<void>;
   uploadImages: (
     roomId: string,
@@ -56,6 +57,14 @@ const roomService: RoomService = {
     const response = await api.put<ApiSuccessResponse<Room>>(
       `/rooms/${id}`,
       payload
+    );
+    return response.data.data;
+  },
+
+  async updateStatus(id, estado) {
+    const response = await api.patch<ApiSuccessResponse<Room>>(
+      `/rooms/${id}/status`,
+      { estado }
     );
     return response.data.data;
   },

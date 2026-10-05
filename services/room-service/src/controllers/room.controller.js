@@ -90,6 +90,22 @@ class RoomController {
     }
   }
 
+  // Actualiza solo el estado de la habitación (Recepción o Admin)
+  static async updateStatus(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { estado } = req.body;
+      const room = await RoomService.updateStatus(id, estado);
+      res.status(200).json({
+        success: true,
+        message: 'Estado de la habitación actualizado correctamente',
+        data: serializeRoom(room),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Elimina una habitación por su ID
   static async remove(req, res, next) {
     try {

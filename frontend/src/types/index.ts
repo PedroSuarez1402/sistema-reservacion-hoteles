@@ -2,7 +2,7 @@ export type UserRole = 'HUESPED' | 'ADMIN' | 'RECEPCION';
 
 export type RoomType = 'SENCILLA' | 'DOBLE' | 'SUITE';
 
-export type RoomStatus = 'ACTIVA' | 'MANTENIMIENTO' | 'ELIMINADA';
+export type RoomStatus = 'ACTIVA' | 'MANTENIMIENTO' | 'LIMPIEZA' | 'ELIMINADA';
 
 export type ReservationStatus =
   | 'PENDIENTE'
