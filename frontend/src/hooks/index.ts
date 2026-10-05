@@ -74,7 +74,22 @@ export type {
   UseUpdateUserOptions,
   UseDeleteUserOptions,
 } from './query/useUsers';
-export { usePackages, usePackage } from './query/usePackages';
+export {
+  usePackages,
+  usePackage,
+  useCreatePackage,
+  useUpdatePackage,
+  useTogglePackageStatus,
+  useDeletePackage,
+} from './query/usePackages';
+export {
+  useServices,
+  useService,
+  useCreateService,
+  useUpdateService,
+  useToggleServiceStatus,
+  useDeleteService,
+} from './query/useServices';
 export {
   useClientesPaginated,
   useClienteDetail,

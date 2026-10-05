@@ -19,4 +19,8 @@ export { CheckInModal } from './CheckInModal';
 export type { CheckInModalProps } from './CheckInModal';
 export { EditarReservaModal } from './EditarReservaModal';
 export type { EditarReservaModalProps } from './EditarReservaModal';
+export { PaqueteModal } from './PaqueteModal';
+export type { PaqueteModalProps } from './PaqueteModal';
+export { ServicioModal } from './ServicioModal';
+export type { ServicioModalProps } from './ServicioModal';
 export * from './ui';

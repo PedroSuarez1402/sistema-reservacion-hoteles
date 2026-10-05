@@ -1,22 +1,12 @@
-import { Paquete, Servicio } from '../models/index.js';
-import { NotFoundError } from '../utils/errors.util.js';
-import { PaqueteCompuesto, ServicioSimple } from '../composite/index.js';
+import PaqueteService from '../services/paquete.service.js';
 
 class PaqueteController {
-  // GET /api/paquetes - Lista todos los paquetes activos con sus servicios
+  // GET /api/paquetes - Lista paquetes (activos por defecto o todos si se pasa ?all=true)
   static async index(req, res, next) {
     try {
-      const paquetes = await Paquete.findAll({
-        where: { estado: 'ACTIVO' },
-        include: [
-          {
-            model: Servicio,
-            as: 'servicios',
-            through: { attributes: ['cantidad'] },
-          },
-        ],
-        order: [['nombre', 'ASC']],
-      });
+      const all = req.query.all === 'true';
+      const estado = req.query.estado || null;
+      const paquetes = await PaqueteService.getAll({ all, estado });
 
       return res.status(200).json({
         success: true,
@@ -32,48 +22,81 @@ class PaqueteController {
   static async show(req, res, next) {
     try {
       const { id } = req.params;
-      const paquete = await Paquete.findByPk(id, {
-        include: [
-          {
-            model: Servicio,
-            as: 'servicios',
-            through: { attributes: ['cantidad'] },
-          },
-        ],
-      });
-
-      if (!paquete) {
-        throw new NotFoundError('Paquete no encontrado');
-      }
-
-      // Demostración del Composite: ensamblamos el árbol y obtenemos su desglose polimórfico
-      const paqueteComposite = new PaqueteCompuesto({
-        paqueteId: paquete.id,
-        nombre: paquete.nombre,
-        descuentoPorcentaje: Number(paquete.descuento_porcentaje) || 0,
-        descripcion: paquete.descripcion,
-      });
-
-      if (paquete.servicios && Array.isArray(paquete.servicios)) {
-        for (const serv of paquete.servicios) {
-          const cantidad = serv.PaqueteServicio?.cantidad || 1;
-          paqueteComposite.agregar(
-            new ServicioSimple({
-              servicioId: serv.id,
-              nombre: serv.nombre,
-              precioUnitario: Number(serv.precio),
-              cantidad,
-              descripcion: serv.descripcion,
-            })
-          );
-        }
-      }
+      const paquete = await PaqueteService.getById(id);
 
       return res.status(200).json({
         success: true,
         message: 'Paquete obtenido correctamente',
         data: paquete,
-        composite_desglose: paqueteComposite.obtenerDesglose(),
+        composite_desglose: paquete.composite_desglose,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // POST /api/paquetes - Crea un nuevo paquete turístico (Admin)
+  static async create(req, res, next) {
+    try {
+      const nuevoPaquete = await PaqueteService.create(req.body);
+
+      return res.status(201).json({
+        success: true,
+        message: 'Paquete turístico creado exitosamente',
+        data: nuevoPaquete,
+        composite_desglose: nuevoPaquete.composite_desglose,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PUT /api/paquetes/:id - Modifica un paquete turístico (Admin)
+  static async update(req, res, next) {
+    try {
+      const { id } = req.params;
+      const actualizado = await PaqueteService.update(id, req.body);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Paquete turístico actualizado correctamente',
+        data: actualizado,
+        composite_desglose: actualizado.composite_desglose,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PATCH /api/paquetes/:id/status - Publica o desactiva un paquete (Admin)
+  static async toggleStatus(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { estado } = req.body || {};
+      const actualizado = await PaqueteService.toggleStatus(id, estado);
+
+      return res.status(200).json({
+        success: true,
+        message: `Estado del paquete actualizado a '${actualizado.estado}'`,
+        data: actualizado,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // DELETE /api/paquetes/:id - Elimina o desactiva un paquete (Admin)
+  static async delete(req, res, next) {
+    try {
+      const { id } = req.params;
+      const resultado = await PaqueteService.delete(id);
+
+      return res.status(200).json({
+        success: true,
+        message: resultado.message,
+        data: resultado.data || null,
+        deleted: resultado.deleted,
+        deactivated: resultado.deactivated,
       });
     } catch (error) {
       next(error);

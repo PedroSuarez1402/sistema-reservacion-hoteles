@@ -87,10 +87,47 @@ export interface Paquete {
   nombre: string;
   descripcion?: string | null;
   descuento_porcentaje: number | string;
+  precio_total?: number | string;
   estado: 'ACTIVO' | 'INACTIVO';
   servicios?: ServicioAdicional[];
+  composite_desglose?: DesgloseComponente;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface PaqueteServicioInput {
+  servicio_id: string;
+  cantidad?: number;
+}
+
+export interface CreatePaquetePayload {
+  nombre: string;
+  descripcion?: string | null;
+  descuento_porcentaje?: number;
+  estado?: 'ACTIVO' | 'INACTIVO';
+  servicios?: PaqueteServicioInput[];
+}
+
+export interface UpdatePaquetePayload {
+  nombre?: string;
+  descripcion?: string | null;
+  descuento_porcentaje?: number;
+  estado?: 'ACTIVO' | 'INACTIVO';
+  servicios?: PaqueteServicioInput[];
+}
+
+export interface CreateServicioPayload {
+  nombre: string;
+  precio: number;
+  descripcion?: string | null;
+  estado?: 'ACTIVO' | 'INACTIVO';
+}
+
+export interface UpdateServicioPayload {
+  nombre?: string;
+  precio?: number;
+  descripcion?: string | null;
+  estado?: 'ACTIVO' | 'INACTIVO';
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +145,7 @@ export interface DesgloseComponente {
   subtotal_bruto?: number;
   descuento_porcentaje?: number;
   descuento_monto?: number;
+  ahorro_descuento?: number;
   total_neto?: number;
   total_items?: number;
   componentes?: DesgloseComponente[];

@@ -4,6 +4,7 @@ import reservationRoutes from './reservation.routes.js';
 import userRoutes from './user.routes.js';
 import paqueteRoutes from './paquete.routes.js';
 import clienteRoutes from './cliente.routes.js';
+import servicioRoutes from './servicio.routes.js';
 
 const router = Router();
 
@@ -22,10 +23,11 @@ router.get('/health', async (req, res, next) => {
   }
 });
 
-// ROUTES - Booking Service expone: reservaciones + clientes + usuarios (staff) + paquetes
+// ROUTES - Booking Service expone: reservaciones + clientes + usuarios (staff) + paquetes + servicios
 router.use('/reservations', reservationRoutes);
 router.use('/clientes', clienteRoutes);
 router.use('/users', userRoutes);
 router.use('/paquetes', paqueteRoutes);
+router.use('/servicios', servicioRoutes);
 
 export default router;

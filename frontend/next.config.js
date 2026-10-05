@@ -68,6 +68,15 @@ const nextConfig = {
         source: '/api/packages/:path*',
         destination: 'http://localhost:4002/api/paquetes/:path*',
       },
+      // Proxy: módulo Servicios Adicionales → backend de reservas (puerto 4002)
+      {
+        source: '/api/servicios/:path*',
+        destination: 'http://localhost:4002/api/servicios/:path*',
+      },
+      {
+        source: '/api/services/:path*',
+        destination: 'http://localhost:4002/api/servicios/:path*',
+      },
       // Proxy: fallback CATCH-ALL → cualquier otra /api/* va al puerto 4002
       {
         source: '/api/:path*',

@@ -25,8 +25,8 @@ async function bootstrap() {
       process.exit(1);
     }
 
-    await sequelize.sync({ alter: false });
-    console.log('✅ Modelos Booking (User + Reservation) sincronizados correctamente.');
+    await sequelize.sync({ alter: true });
+    console.log('✅ Modelos Booking (User + Reservation + Paquete + Servicio) sincronizados correctamente.');
 
     const server = http.createServer(app);
 
