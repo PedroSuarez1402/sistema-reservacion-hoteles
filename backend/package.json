@@ -10,6 +10,8 @@
     "start": "node --env-file=.env index.js",
     "dev": "node --env-file=.env --watch index.js",
     "test": "node --test",
+    "db:ensure": "node --env-file=.env ensure-db.js",
+    "db:sync": "node --env-file=.env sync-db.js",
     "seed": "node --env-file=.env src/seeders/index.js",
     "seed:undo": "node --env-file=.env src/seeders/undo.js"
   },

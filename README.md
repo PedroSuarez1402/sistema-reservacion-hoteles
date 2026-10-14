@@ -35,69 +35,78 @@ sistema-reservacion-hoteles/
 
 ---
 
----
-
 ## 📋 Requisitos previos
 
 Antes de empezar, asegúrate de tener instalado:
 
-| Herramienta | Versión recomendada |
-|-------------|---------------------|
-| Node.js     | **22.x** o superior |
-| npm         | 10.x (incluido con Node 22) |
-| MySQL       | 8.0 o superior      |
-| Git         | Cualquier versión reciente |
+| Herramienta | Versión recomendada | Notas |
+|-------------|---------------------|-------|
+| Node.js     | **22.x** o superior | Requerido por la sintaxis nativa `--env-file` |
+| npm         | **10.x** o superior | Incluido junto con Node.js |
+| MySQL       | **8.0** o superior  | Servicio MySQL corriendo localmente en el puerto 3306 |
+| Git         | Cualquier versión reciente | Para clonar el repositorio |
 
 ---
 
 ## 🚀 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/TU_USUARIO/sistema-reservacion-hoteles.git
+git clone https://github.com/PedroSuarez1402/sistema-reservacion-hoteles.git
 cd sistema-reservacion-hoteles
 ```
 
-> ⚠️ Reemplaza `TU_USUARIO` por la URL real de tu repositorio.
+## ⚙️ 2. Instalar dependencias
 
----
-
-## ⚙️ 2. Instalación local
-
-### 2.1 Instalar dependencias del frontend
+Para la arquitectura recomendada (Microservicios + Frontend Next.js), instala las dependencias de cada módulo:
 
 ```bash
+# 1. Frontend Web (Next.js)
 cd frontend
 npm install
 cd ..
-```
 
-### 2.2 Instalar dependencias de cada microservicio
-
-```bash
-# Microservicio de habitaciones (room-service)
+# 2. Microservicio de Habitaciones y Catálogo (room-service)
 cd services/room-service
 npm install
 cd ../..
 
-# Microservicio de reservas (booking-service)
+# 3. Microservicio de Reservas y Usuarios (booking-service)
 cd services/booking-service
+npm install
+cd ../..
+
+# 4. Message Broker Pub/Sub (message-broker)
+cd services/message-broker
 npm install
 cd ../..
 ```
 
 ---
 
-### 2.3 Configurar variables de entorno
+## 🔐 3. Configurar variables de entorno (.env)
 
-Cada microservicio tiene su propio archivo `.env`. Copia la plantilla `.env.example` a `.env` en **cada servicio** y ajusta tus credenciales de MySQL:
+Cada servicio cuenta con su archivo de plantilla `.env.example`. Copia cada uno a un archivo `.env` en su respectiva carpeta:
 
-#### a) services/room-service/.env
+### 3.1 Copiar plantillas
+
+```bash
+# En Linux / macOS / Bash:
+cp services/room-service/.env.example services/room-service/.env
+cp services/booking-service/.env.example services/booking-service/.env
+cp services/message-broker/.env.example services/message-broker/.env
+
+# En Windows (PowerShell):
+# copy services/room-service/.env.example services/room-service/.env
+# copy services/booking-service/.env.example services/booking-service/.env
+# copy services/message-broker/.env.example services/message-broker/.env
+```
+
+### 3.2 Ajustar credenciales en los archivos `.env`
+
+Abre `services/room-service/.env` y `services/booking-service/.env` con tu editor y configura tus credenciales de MySQL:
+
 ```env
-PORT=4001
-NODE_ENV=development
-FRONTEND_URL=http://localhost:3000
-
-# MySQL (misma instancia para ambos servicios)
+# MySQL (ambos servicios apuntan a la misma base de datos 'sistema-reservas')
 DB_NAME=sistema-reservas
 DB_USER=root
 DB_PASSWORD=tu_contraseña_mysql
@@ -105,185 +114,228 @@ DB_HOST=localhost
 DB_PORT=3306
 DB_SSL=false
 
-JWT_SECRET=una_clave_secreta_larga_y_random
+# Clave secreta para tokens JWT (¡DEBE SER IDÉNTICA EN AMBOS SERVICIOS!)
+JWT_SECRET=una_clave_secreta_compartida_super_segura
 JWT_EXPIRES_IN=24h
 BCRYPT_SALT_ROUNDS=10
+
+# Message Broker central
+BROKER_URL=http://localhost:4003
 ```
 
-#### b) services/booking-service/.env
-```env
-PORT=4002
-NODE_ENV=development
-FRONTEND_URL=http://localhost:3000
-
-# MySQL (mismo esquema que room-service)
-DB_NAME=sistema-reservas
-DB_USER=root
-DB_PASSWORD=tu_contraseña_mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_SSL=false
-
-JWT_SECRET=la_misma_clave_secreta_que_room_service
-JWT_EXPIRES_IN=24h
-BCRYPT_SALT_ROUNDS=10
-```
-
-> 🔐 **Importante**: Ambos servicios deben compartir el **mismo `JWT_SECRET`** para que los tokens sean válidos en toda la plataforma.
+> 🔐 **Importante**: `room-service` y `booking-service` **deben compartir el mismo `JWT_SECRET`** para que los tokens emitidos en autenticación sean válidos en ambos microservicios.
 
 ---
 
-### 2.4 Crear la base de datos en MySQL
+## 🗄️ 4. Base de datos MySQL (Creación, Sincronización y Seeders)
 
-El script `ensure-db.js` existe en **cada** microservicio. Puedes correr cualquiera de los dos (o ambos, es idempotente) para crear automáticamente la base de datos `sistema-reservas` si no existe:
+Para poner en marcha la base de datos desde cero, sigue estos **3 pasos en orden**:
+
+```mermaid
+flowchart LR
+    A["1. Crear BD<br/>(ensure-db.js)"] --> B["2. Sincronizar Tablas<br/>(sync-db.js)"] --> C["3. Cargar Seeders<br/>(room & booking)"]
+```
+
+---
+
+### Paso 4.1: Crear la Base de Datos (`ensure-db`)
+
+Crea la base de datos `sistema-reservas` en MySQL si aún no existe. Es un script idempotente (puedes ejecutarlo desde `room-service` o `booking-service`):
 
 ```bash
-# Opción A: desde room-service
 cd services/room-service
-node --env-file=.env ensure-db.js
-cd ../..
-
-# Opción B: desde booking-service
-cd services/booking-service
-node --env-file=.env ensure-db.js
+npm run db:ensure
+# O alternativamente: node --env-file=.env ensure-db.js
 cd ../..
 ```
 
-> Salida esperada: `✅ Base de datos 'sistema-reservas' creada exitosamente.` o `✅ Base de datos 'sistema-reservas' ya existe.`
+> ✅ Salida esperada: `✅ Base de datos 'sistema-reservas' creada exitosamente.` o `✅ Base de datos 'sistema-reservas' ya existe.`
 
 ---
 
-## 🗄️ 3. Cargar datos iniciales (Seeders)
+### Paso 4.2: Sincronizar las Tablas con los Modelos (`sync-db`)
 
-Cada microservicio gestiona sus propias tablas, por lo tanto tienes **dos seeders independientes** que debes ejecutar.
+> ⚠️ **¡Paso clave antes de los seeders!**  
+> `ensure-db.js` únicamente crea la base de datos vacía, **no crea las tablas**.  
+> El script **`sync-db.js`** lee los modelos Sequelize y crea físicamente las tablas y llaves foráneas en MySQL. Debes sincronizar ambos microservicios:
 
-### ✅ Orden recomendado de ejecución
+```bash
+# 1. Crear tablas del catálogo (habitaciones, etiquetas, imagenes_habitacion, etc.)
+cd services/room-service
+npm run db:sync
+# O alternativamente: node --env-file=.env sync-db.js
+cd ../..
 
-⚠️ **Importante**: Ejecuta primero `room-service` y luego `booking-service`. Esto es porque `booking-service` necesita que las habitaciones ya existan para asociarlas a las reservaciones de ejemplo.
+# 2. Crear tablas de negocio (usuarios, clientes, acompanantes, reservaciones, paquetes, servicios, etc.)
+cd services/booking-service
+npm run db:sync
+# O alternativamente: node --env-file=.env sync-db.js
+cd ../..
+```
+
+> 💡 **Tip para migraciones posteriores**:  
+> Si agregas o modificas campos en los modelos en el futuro sin querer borrar datos, puedes ejecutar `npm run db:sync -- --alter` (o `node --env-file=.env sync-db.js --alter`).  
+> Si deseas reconstruir las tablas desde cero borrando todo, puedes usar `npm run db:sync -- --force`.
 
 ---
 
-### 3.1 Cargar Catálogo (Habitaciones + Etiquetas + Imágenes)
+### Paso 4.3: Cargar datos iniciales de prueba (Seeders)
 
-Microservicio: **`services/room-service`**
+Una vez que las tablas existen, carga la información de prueba respetando el orden de dependencias:
 
+#### 1️⃣ Cargar Catálogo (primero):
 ```bash
 cd services/room-service
 npm run seed
+cd ../..
 ```
+* **Qué hace**: Inserta comodidades/etiquetas y crea las habitaciones tipo **SENCILLA**, **DOBLE** y **SUITE** con sus etiquetas e imágenes asociadas.
 
-**Qué hace**:
-1. Limpia las tablas del catálogo (`habitaciones_etiquetas` → `habitaciones` → `etiquetas`)
-2. Inserta 25+ etiquetas/comodidades
-3. Crea habitaciones de tipo **SENCILLA**, **DOBLE** y **SUITE** con sus etiquetas asociadas
-4. Muestra el resumen en consola
-
----
-
-### 3.2 Cargar Usuarios + Reservaciones demo
-
-Microservicio: **`services/booking-service`**
-
+#### 2️⃣ Cargar Usuarios, Clientes y Reservaciones demo (segundo):
 ```bash
 cd services/booking-service
 npm run seed
+cd ../..
 ```
-
-**Qué hace**:
-1. Limpia las tablas `reservaciones` → `usuarios`
-2. Crea usuarios con los 3 roles: **ADMIN**, **RECEPCION** y **HUÉSPED**
-3. Crea reservaciones de ejemplo asociadas a las habitaciones creadas en el paso anterior
-4. Muestra credenciales de acceso en consola
+* **Qué hace**: Inserta el catálogo de servicios adicionales y paquetes turísticos, crea los usuarios administradores y de recepción, los clientes huéspedes y reservaciones de prueba asociadas a las habitaciones creadas en el paso anterior.
 
 ---
 
-### 🔐 Credenciales de prueba (después de ejecutar AMBOS seeders)
+### 🔑 Credenciales de acceso de prueba
 
-| Rol        | Email                     | Contraseña    |
-|------------|---------------------------|---------------|
-| ADMIN      | admin@hotel.com           | Admin123      |
-| RECEPCION  | recepcion@hotel.com       | Recepcion123  |
-| Huésped    | huesped@hotel.com         | Huesped123    |
-| Huésped    | juan.perez@example.com    | Huesped123    |
-| Huésped    | ana.gomez@example.com     | Huesped123    |
-| Huésped    | carlos.ruiz@example.com   | Huesped123    |
+Tras ejecutar los seeders, dispones de los siguientes usuarios:
+
+| Rol | Correo Electrónico | Contraseña | Permisos |
+|---|---|---|---|
+| **ADMIN** | `admin@hotel.com` | `Admin123` | Control total del sistema, catálogo, imágenes y reservas |
+| **RECEPCIÓN** | `recepcion@hotel.com` | `Recepcion123` | Gestión de reservas, check-in/out, clientes |
+| **HUÉSPED** | `juan.perez@example.com` | `Huesped123` | Consulta de habitaciones y reserva de estadías |
+| **HUÉSPED** | `ana.gomez@example.com` | `Huesped123` | Consulta y reservas |
+| **HUÉSPED** | `carlos.ruiz@example.com` | `Huesped123` | Consulta y reservas |
 
 ---
 
-### 🧹 Limpiar datos de un servicio individual
+## ▶️ 5. Ejecutar la aplicación completa (Microservicios)
 
-Si necesitas vaciar **solo** las tablas de un microservicio sin volver a sembrar:
+Abre **4 terminales** para iniciar cada componente del ecosistema:
 
+### Terminal 1 — Message Broker Pub/Sub (Puerto 4003)
 ```bash
-# Vaciar solo catálogo (habitaciones/etiquetas)
-cd services/room-service
-npm run seed:undo
-
-# Vaciar solo usuarios/reservaciones
-cd services/booking-service
-npm run seed:undo
+cd services/message-broker
+npm run dev
 ```
+> 📨 Broker URL: **http://localhost:4003** (Bus de eventos asíncronos desacoplado)
 
 ---
 
-## ▶️ 4. Ejecutar la aplicación completa
-
-Necesitas **3 terminales abiertas** (una por servicio):
-
-**Terminal 1 — Microservicio de habitaciones (room-service):**
+### Terminal 2 — Microservicio de Habitaciones (Puerto 4001)
 ```bash
 cd services/room-service
 npm run dev
 ```
-> 🟡 Catálogo API: **http://localhost:4001**
+> 🏨 Catálogo API: **http://localhost:4001**  
+> 🩺 Health: **http://localhost:4001/api/health**
 
-**Terminal 2 — Microservicio de reservas (booking-service):**
+---
+
+### Terminal 3 — Microservicio de Reservas y Usuarios (Puerto 4002)
 ```bash
 cd services/booking-service
 npm run dev
 ```
-> 🔴 Reservas/Usuarios API: **http://localhost:4002**
+> 📅 Reservas API: **http://localhost:4002**  
+> 🩺 Health: **http://localhost:4002/api/health**
 
-**Terminal 3 — Frontend Next.js:**
+---
+
+### Terminal 4 — Frontend Web Next.js (Puerto 3000)
 ```bash
 cd frontend
 npm run dev
 ```
 > 🔵 Aplicación Web: **http://localhost:3000**
 
-> 💡 El frontend ya tiene configurado un proxy interno (rewrites en `next.config.js`) que redirige `/api/*` al microservicio correspondiente. Para el navegador todo parece venir del **mismo origen**, evitando problemas de CORS.
+> 💡 **API Gateway transparente**: El Frontend en Next.js tiene configurados *rewrites* internos en `next.config.js`. Cuando el cliente solicita `/api/rooms` o `/api/reservations`, Next.js los reenvía de forma transparente a los puertos 4001 y 4002 respectivamente, resolviendo peticiones bajo el mismo origen sin problemas de CORS.
+
+---
+
+## 🏛️ 6. ¿Deseas probar la versión Monolítica (Línea Base)?
+
+Si requieres evaluar la versión comparativa monolítica (sin patrones de diseño):
+
+```bash
+# 1. Backend Monolítico
+cd backend
+npm install
+cp .env.example .env     # Configura tus credenciales MySQL en .env (Puerto 4000)
+npm run db:ensure        # Crea la base de datos si no existe
+npm run db:sync          # Sincroniza todas las tablas con Sequelize
+npm run seed             # Carga los datos de prueba
+npm run dev              # Inicia el backend en http://localhost:4000
+cd ..
+
+# 2. Frontend Monolito (en otra terminal)
+cd frontend-monolito
+npm install
+npm run dev              # Inicia el frontend en http://localhost:3001
+```
 
 ---
 
 ## 📌 Resumen de comandos rápidos
 
-### 🎯 Frontend (carpeta `frontend/`)
+### 🎨 Frontend (`frontend/`) — Puerto 3000
 | Comando | Descripción |
 |---|---|
 | `npm install` | Instalar dependencias |
-| `npm run dev` | Iniciar Next.js (modo desarrollo) |
-| `npm run build && npm start` | Compilar y ejecutar en producción |
+| `npm run dev` | Iniciar servidor de desarrollo en http://localhost:3000 |
+| `npm run build && npm start` | Compilar y arrancar en producción |
+| `npm run test` | Ejecutar pruebas unitarias con Vitest |
 
 ---
 
-### 🏨 Microservicio `services/room-service` (puerto 4001)
+### 📨 Message Broker (`services/message-broker/`) — Puerto 4003
 | Comando | Descripción |
 |---|---|
 | `npm install` | Instalar dependencias |
-| `node --env-file=.env ensure-db.js` | Crear la BD en MySQL si no existe |
-| **`npm run seed`** | **Cargar habitaciones + etiquetas** (catálogo) |
+| `npm run dev` | Iniciar broker en modo watch (http://localhost:4003) |
+| `npm start` | Iniciar broker en modo producción |
+
+---
+
+### 🏨 Microservicio Habitaciones (`services/room-service/`) — Puerto 4001
+| Comando | Descripción |
+|---|---|
+| `npm install` | Instalar dependencias |
+| `npm run db:ensure` | Crear base de datos en MySQL si no existe |
+| `npm run db:sync` | Sincronizar y crear tablas de catálogo en MySQL |
+| `npm run db:sync -- --alter` | Actualizar tablas sin borrar datos existentes |
+| `npm run seed` | Cargar catálogo inicial (habitaciones y etiquetas) |
 | `npm run seed:undo` | Vaciar tablas del catálogo |
-| `npm run dev` | Iniciar servidor (modo watch) |
-| `npm start` | Iniciar servidor (modo producción) |
+| `npm run dev` | Iniciar servidor en modo watch (http://localhost:4001) |
 
 ---
 
-### 📅 Microservicio `services/booking-service` (puerto 4002)
+### 📅 Microservicio Reservas (`services/booking-service/`) — Puerto 4002
 | Comando | Descripción |
 |---|---|
 | `npm install` | Instalar dependencias |
-| `node --env-file=.env ensure-db.js` | Crear la BD en MySQL si no existe |
-| **`npm run seed`** | **Cargar usuarios + reservaciones demo** (ejecutar DESPUÉS del seed de room-service) |
-| `npm run seed:undo` | Vaciar tablas de usuarios/reservaciones |
-| `npm run dev` | Iniciar servidor (modo watch) |
-| `npm start` | Iniciar servidor (modo producción) |
+| `npm run db:ensure` | Crear base de datos en MySQL si no existe |
+| `npm run db:sync` | Sincronizar y crear tablas de reservas/usuarios en MySQL |
+| `npm run db:sync -- --alter` | Actualizar tablas sin borrar datos existentes |
+| `npm run seed` | Cargar usuarios, clientes y reservaciones de prueba |
+| `npm run seed:undo` | Vaciar tablas de reservas y usuarios |
+| `npm run dev` | Iniciar servidor en modo watch (http://localhost:4002) |
+
+---
+
+### 🏛️ Backend Monolítico (`backend/`) — Puerto 4000
+| Comando | Descripción |
+|---|---|
+| `npm install` | Instalar dependencias |
+| `npm run db:ensure` | Crear base de datos en MySQL si no existe |
+| `npm run db:sync` | Sincronizar todas las tablas del modelo relacional en MySQL |
+| `npm run db:sync -- --alter` | Actualizar tablas sin borrar datos existentes |
+| `npm run seed` | Cargar todos los datos demo (usuarios, habitaciones, servicios, paquetes, reservas) |
+| `npm run seed:undo` | Vaciar todas las tablas |
+| `npm run dev` | Iniciar servidor en modo watch (http://localhost:4000) |
