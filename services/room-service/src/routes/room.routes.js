@@ -8,6 +8,7 @@ const router = Router();
 
 router.get('/', RoomController.getAll);
 router.get('/available', RoomController.getAvailable);
+router.get('/flyweight-stats', RoomController.getFlyweightStats);
 router.post('/', verifyToken, isAdmin, RoomController.create);
 router.get('/:id', RoomController.getById);
 router.put('/:id', verifyToken, isAdmin, RoomController.update);

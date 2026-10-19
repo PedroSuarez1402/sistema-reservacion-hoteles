@@ -57,9 +57,64 @@ class RoomService {
     return await RoomRepository.getById(created.id);
   }
 
-  // Obtiene lista habitaciones con filtros opcionales
+  // ===========================================================================
+  // En esta sección se cumple lo que hace el patrón de Flyweight SIN aplicar el patrón:
+  // Por cada habitación consultada, se crean desde cero en memoria RAM nuevos
+  // objetos para las especificaciones de su categoría (SENCILLA, DOBLE, SUITE)
+  // y nuevas instancias para cada una de sus etiquetas (tags), duplicando la
+  // información común en cada objeto de habitación en lugar de compartirla.
+  // ===========================================================================
+  static armarHabitacionSinFlyweight(room) {
+    const plain = typeof room?.toJSON === 'function' ? room.toJSON() : { ...room };
+
+    // Se instancia un objeto nuevo en RAM por cada habitación (sin compartir estado intrínseco)
+    let especificaciones_tipo;
+    if (plain.tipo === 'SUITE') {
+      especificaciones_tipo = {
+        tipo: 'SUITE',
+        capacidad_maxima: 4,
+        tipo_cama: '1 Cama King Size + Sofá Cama',
+        dimensiones_m2: 55,
+        politica_check_in_out: 'Check-in 14:00 / Late Check-out 13:00',
+      };
+    } else if (plain.tipo === 'DOBLE') {
+      especificaciones_tipo = {
+        tipo: 'DOBLE',
+        capacidad_maxima: 2,
+        tipo_cama: '2 Camas Sencillas o 1 Cama Queen',
+        dimensiones_m2: 32,
+        politica_check_in_out: 'Check-in 15:00 / Check-out 12:00',
+      };
+    } else {
+      especificaciones_tipo = {
+        tipo: 'SENCILLA',
+        capacidad_maxima: 1,
+        tipo_cama: '1 Cama Sencilla (Twin)',
+        dimensiones_m2: 20,
+        politica_check_in_out: 'Check-in 15:00 / Check-out 12:00',
+      };
+    }
+
+    // Se clona cada etiqueta en un nuevo objeto en memoria por cada habitación
+    const etiquetasDuplicadas = Array.isArray(plain.etiquetas)
+      ? plain.etiquetas.map((tag) => ({
+          id: tag.id,
+          nombre: tag.nombre,
+          descripcion: tag.descripcion ?? null,
+        }))
+      : [];
+
+    return {
+      ...plain,
+      especificaciones_tipo,
+      etiquetas: etiquetasDuplicadas,
+    };
+  }
+
+  // Obtiene lista habitaciones con filtros opcionales (sin patrón Flyweight)
   static async getAll(filters = {}) {
-    return await RoomRepository.getAll({ where: filters });
+    const rooms = await RoomRepository.getAll({ where: filters });
+    return rooms.map((room) => this.armarHabitacionSinFlyweight(room));
   }
 
   // Obtiene habitación por ID o lanza 404
@@ -69,7 +124,7 @@ class RoomService {
     if (!room) {
       throw new NotFoundError('Habitación no encontrada');
     }
-    return room;
+    return this.armarHabitacionSinFlyweight(room);
   }
 
   // Obtiene habitaciones disponibles en rango fechas
@@ -82,12 +137,17 @@ class RoomService {
     if (inicio >= fin) {
       throw new BadRequestError('La fecha de inicio debe ser anterior a la fecha de fin');
     }
-    return await RoomRepository.getAvailableRooms(inicio, fin);
+    const availableRooms = await RoomRepository.getAvailableRooms(inicio, fin);
+    return availableRooms.map((room) => this.armarHabitacionSinFlyweight(room));
   }
 
   // Actualiza habitación y sus etiquetas asociadas
   static async update(id, data) {
-    const existing = await this.getById(id);
+    assertRequired(id, 'El id de la habitación es requerido');
+    const existing = await RoomRepository.getById(id);
+    if (!existing) {
+      throw new NotFoundError('Habitación no encontrada');
+    }
     if (data.numero) {
       const dup = await RoomRepository.getByNumero(data.numero);
       if (dup && dup.id !== id) {

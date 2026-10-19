@@ -119,6 +119,20 @@ class RoomController {
       next(error);
     }
   }
+
+  // Obtiene estadísticas en tiempo real del pool de memoria del patrón Flyweight
+  static async getFlyweightStats(req, res, next) {
+    try {
+      const stats = RoomService.getFlyweightStats();
+      res.status(200).json({
+        success: true,
+        message: 'Estadísticas de memoria del patrón Flyweight obtenidas correctamente',
+        data: stats,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default RoomController;

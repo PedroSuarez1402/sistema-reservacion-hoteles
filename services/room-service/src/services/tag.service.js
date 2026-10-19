@@ -1,5 +1,6 @@
 import { BadRequestError, NotFoundError, ConflictError } from '../utils/errors.util.js';
 import TagRepository from '../repositories/tag.repository.js';
+import { RoomFlyweightFactory } from '../flyweight/index.js';
 
 const NOMBRE_MAX_LEN = 100;
 
@@ -60,20 +61,22 @@ async function create(payload) {
   return row.get({ plain: true });
 }
 
-// Actualiza etiqueta existente tras sanitizar
+// Actualiza etiqueta existente tras sanitizar e invalida el Flyweight en RAM
 async function update(id, payload) {
   const existing = await TagRepository.findById(id);
   if (!existing) throw new NotFoundError('Etiqueta no encontrada');
   const clean = await sanitizePayload(payload, { excludeId: id });
   const updated = await TagRepository.update(id, clean);
+  RoomFlyweightFactory.invalidarEtiqueta(id);
   return updated.get({ plain: true });
 }
 
-// Elimina etiqueta por ID, lanza 404 si no existe
+// Elimina etiqueta por ID e invalida el Flyweight en RAM
 async function remove(id) {
   const existing = await TagRepository.findById(id);
   if (!existing) throw new NotFoundError('Etiqueta no encontrada');
   await TagRepository.remove(id);
+  RoomFlyweightFactory.invalidarEtiqueta(id);
   return true;
 }
 

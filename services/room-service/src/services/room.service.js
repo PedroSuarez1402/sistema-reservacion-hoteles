@@ -12,6 +12,7 @@ import {
   assertRequired,
 } from '../utils/errors.util.js';
 import { RoomFactory } from '../factories/room.factory.js';
+import { RoomContext, RoomFlyweightFactory } from '../flyweight/index.js';
 
 
 class RoomService {
@@ -71,11 +72,21 @@ class RoomService {
         try { await created.setEtiquetas([]); } catch (_) { /* ignore */ }
       }
     }
-    return await RoomRepository.getById(created.id);
+    const createdRoom = await RoomRepository.getById(created.id);
+    // Aquí se usa el patrón Flyweight al retornar el contexto con estado intrínseco compartido
+    return new RoomContext(createdRoom);
   }
 
+  // ===========================================================================
+  // Aquí se usa el patrón Flyweight:
+  // Al obtener las habitaciones, cada registro se envuelve en un RoomContext
+  // (Estado Extrínseco: número de puerta, precio, estado) que reutiliza desde
+  // RoomFlyweightFactory una única instancia en memoria RAM para cada etiqueta
+  // (TagFlyweight) y cada categoría (RoomCategoryFlyweight) como Estado Intrínseco.
+  // ===========================================================================
   static async getAll(filters = {}) {
-    return await RoomRepository.getAll({ where: filters });
+    const rooms = await RoomRepository.getAll({ where: filters });
+    return rooms.map((room) => new RoomContext(room));
   }
 
   static async getById(id) {
@@ -84,7 +95,8 @@ class RoomService {
     if (!room) {
       throw new NotFoundError('Habitación no encontrada');
     }
-    return room;
+    // Aquí se usa el patrón Flyweight para compartir categoría y etiquetas en RAM
+    return new RoomContext(room);
   }
 
   static async getAvailable(fecha_inicio, fecha_fin) {
@@ -96,14 +108,27 @@ class RoomService {
     if (inicio >= fin) {
       throw new BadRequestError('La fecha de inicio debe ser anterior a la fecha de fin');
     }
-    return await RoomRepository.getAvailableRooms(inicio, fin);
+    const availableRooms = await RoomRepository.getAvailableRooms(inicio, fin);
+    // Aquí se usa el patrón Flyweight en las habitaciones disponibles
+    return availableRooms.map((room) => new RoomContext(room));
+  }
+
+  /**
+   * Expone las métricas de ahorro de memoria del pool de Flyweights en RAM.
+   */
+  static getFlyweightStats() {
+    return RoomFlyweightFactory.obtenerEstadisticasMemoria();
   }
 
   /**
    * Actualiza una habitación. Si se modifica el tipo, se recurre a la fábrica para autocompletar defaults.
    */
   static async update(id, data) {
-    const existing = await this.getById(id);
+    assertRequired(id, 'El id de la habitación es requerido');
+    const existing = await RoomRepository.getById(id);
+    if (!existing) {
+      throw new NotFoundError('Habitación no encontrada');
+    }
 
     if (data.numero) {
       const dup = await RoomRepository.getByNumero(data.numero);
@@ -151,7 +176,8 @@ class RoomService {
     if (tagIdsToSet !== null) {
       try { await existing.setEtiquetas(tagIdsToSet); } catch (_) { /* ignore */ }
     }
-    return await RoomRepository.getById(id);
+    const updatedRoom = await RoomRepository.getById(id);
+    return new RoomContext(updatedRoom);
   }
 
   static async updateStatus(id, estado) {
@@ -163,7 +189,8 @@ class RoomService {
     }
     await this.getById(id);
     await RoomRepository.update(id, { estado });
-    return await RoomRepository.getById(id);
+    const updatedRoom = await RoomRepository.getById(id);
+    return new RoomContext(updatedRoom);
   }
 
   static async delete(id) {
