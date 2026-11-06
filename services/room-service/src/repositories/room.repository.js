@@ -75,20 +75,51 @@ class RoomRepository {
     return count > 0;
   }
 
-  // Obtiene habitaciones activas (disponibilidad real se calcula en booking-service)
-  static async getAvailableRooms(fechaInicio, fechaFin) {
+  /**
+   * Obtiene habitaciones activas disponibles en el rango de fechas,
+   * descartando MANTENIMIENTO y aquellas con reservas activas (occupiedRoomIds).
+   * Opcionalmente filtra por categoría ('SENCILLA', 'DOBLE', 'SUITE').
+   */
+  static async getAvailableRooms(paramsOrInicio, maybeFin) {
+    let fechaInicio;
+    let fechaFin;
+    let categoria = null;
+    let occupiedRoomIds = [];
+
+    if (paramsOrInicio && typeof paramsOrInicio === 'object' && !(paramsOrInicio instanceof Date)) {
+      fechaInicio = paramsOrInicio.fechaInicio;
+      fechaFin = paramsOrInicio.fechaFin;
+      categoria = paramsOrInicio.categoria || paramsOrInicio.tipo || null;
+      occupiedRoomIds = Array.isArray(paramsOrInicio.occupiedRoomIds) ? paramsOrInicio.occupiedRoomIds : [];
+    } else {
+      fechaInicio = paramsOrInicio;
+      fechaFin = maybeFin;
+    }
+
     const inicio = new Date(fechaInicio);
     const fin = new Date(fechaFin);
     if (inicio >= fin) return [];
 
+    const where = {
+      estado: 'ACTIVA', // Descarta MANTENIMIENTO, LIMPIEZA y ELIMINADA
+    };
+
+    if (categoria) {
+      where.tipo = String(categoria).trim().toUpperCase();
+    }
+
+    if (Array.isArray(occupiedRoomIds) && occupiedRoomIds.length > 0) {
+      where.id = { [Op.notIn]: occupiedRoomIds };
+    }
+
     return await Room.findAll({
-      where: { estado: 'ACTIVA' },
+      where,
       order: [['numero', 'ASC']],
       include: defaultIncludes,
     });
   }
 
-  // Verifica disponibilidad habitación (solo estado; solapamientos = booking-service)
+  // Verifica disponibilidad básica de una habitación específica
   static async checkAvailability(habitacion_id, fechaInicio, fechaFin, excludeReservationId = null) {
     const room = await this.getById(habitacion_id);
     if (!room) return false;

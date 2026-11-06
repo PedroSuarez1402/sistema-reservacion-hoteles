@@ -6,6 +6,7 @@ import reservationRoutes from './reservation.routes.js';
 import tagRoutes from './tag.routes.js';
 import paqueteRoutes from './paquete.routes.js';
 import servicioRoutes from './servicio.routes.js';
+import patronesRoutes from './patrones.routes.js';
 
 const router = Router();
 
@@ -29,5 +30,6 @@ router.use('/reservations', reservationRoutes);
 router.use('/tags', tagRoutes);
 router.use('/paquetes', paqueteRoutes);
 router.use('/servicios', servicioRoutes);
+router.use('/patrones', patronesRoutes);
 
 export default router;

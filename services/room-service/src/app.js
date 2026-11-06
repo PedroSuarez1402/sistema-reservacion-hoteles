@@ -85,6 +85,8 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api', routes);
+app.use('/', routes); // Permite invocar /events o /health directamente si se omitió /api
+
 
 app.use((req, res, next) => {
   res.status(404).json({

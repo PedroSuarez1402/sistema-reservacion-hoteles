@@ -21,7 +21,7 @@ const MAX_HISTORY = Number(process.env.BROKER_MAX_HISTORY) || 1000;
 function uidShort() { return `evt_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`; }
 
 // 1. Registro de Suscriptores (Subscribe)
-app.post('/api/broker/subscribe', function subscribeHandler(req, res) {
+app.post(['/api/broker/subscribe', '/subscribe'], function subscribeHandler(req, res) {
   try {
     const { topico, subscriberUrl } = req.body || {};
     const top = String(topico || '').trim().toUpperCase();
@@ -51,7 +51,7 @@ app.post('/api/broker/subscribe', function subscribeHandler(req, res) {
 });
 
 // 2. Publicación y Despacho de Eventos (Publish)
-app.post('/api/broker/publish', function publishHandler(req, res) {
+app.post(['/api/broker/publish', '/publish'], function publishHandler(req, res) {
   try {
     const { topico, payload, publishedBy } = req.body || {};
     const top = String(topico || '').trim().toUpperCase();
@@ -73,33 +73,46 @@ app.post('/api/broker/publish', function publishHandler(req, res) {
     EVENT_HISTORY.unshift(event);
     while (EVENT_HISTORY.length > MAX_HISTORY) EVENT_HISTORY.pop();
 
-    // Despacho asíncrono no bloqueante a los suscriptores registrados
-    const subsForTopic = SUBSCRIPTIONS[top] || [];
+// Despacho asíncrono no bloqueante en paralelo a todos los suscriptores
+    const subsForTopic = (SUBSCRIPTIONS[top] || []).slice();
     setImmediate(async function dispatchAsync() {
-      for (const s of subsForTopic) {
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 5000);
-          const resp = await fetch(s.subscriberUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-broker-event-id': eventId, 'x-broker-topico': top },
-            body: JSON.stringify({ eventId, topico: top, payload: event.payload, timestamp }),
-            signal: controller.signal,
-          }).finally(() => clearTimeout(timer));
-          event.dispatch.push({
-            url: s.subscriberUrl,
-            status: resp.status,
-            at: new Date().toISOString(),
-          });
-        } catch (err) {
-          event.dispatch.push({
-            url: s.subscriberUrl,
-            status: 'ERROR',
-            at: new Date().toISOString(),
-            err: err && err.message ? err.message : String(err),
-          });
-        }
-      }
+      await Promise.allSettled(
+        subsForTopic.map(async (s) => {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 5000);
+            const resp = await fetch(s.subscriberUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-broker-event-id': eventId,
+                'x-broker-topico': top,
+              },
+              body: JSON.stringify({
+                eventId,
+                topico: top,
+                payload: event.payload,
+                timestamp,
+              }),
+              signal: controller.signal,
+            }).finally(() => clearTimeout(timer));
+
+            event.dispatch.push({
+              url: s.subscriberUrl,
+              status: resp.status,
+              at: new Date().toISOString(),
+            });
+          } catch (err) {
+            // Un suscriptor caído, timeout o inalcanzable jamás tumba el broker ni bloquea a otros
+            event.dispatch.push({
+              url: s.subscriberUrl,
+              status: 'ERROR',
+              at: new Date().toISOString(),
+              err: err && err.message ? err.message : String(err),
+            });
+          }
+        })
+      );
     });
 
     // Retorna 202 Accepted inmediatamente al Publisher
@@ -118,7 +131,7 @@ app.post('/api/broker/publish', function publishHandler(req, res) {
 });
 
 // 3. Consulta de Auditoría (Historial)
-app.get('/api/broker/events', function eventsHandler(req, res) {
+app.get(['/api/broker/events', '/events'], function eventsHandler(req, res) {
   try {
     let arr = EVENT_HISTORY.slice();
     const top = String(req.query.topico || '').trim().toUpperCase();
@@ -176,3 +189,12 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     setTimeout(() => process.exit(0), 5000).unref();
   });
 }
+
+// Protecciones contra caídas no controladas por suscriptores fallidos
+process.on('unhandledRejection', (reason) => {
+  console.warn('[Broker] Unhandled Rejection capturado (protección activa):', reason && reason.message ? reason.message : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[Broker] Uncaught Exception capturado (protección activa):', err && err.message ? err.message : err);
+});
+

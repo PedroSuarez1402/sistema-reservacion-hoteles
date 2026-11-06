@@ -13,11 +13,11 @@ import {
 // ==========================================
 export class CreadorHabitacion {
     /**
-   * Método Fábrica (Factory Method)
-   * Cada subclase concreta debe sobreescribirlo para retornar su producto específico.
-   * @param {Object} datos
-   * @returns {import('./room.products.js').HabitacionBase}
-   */
+     * Método Fábrica (Factory Method)
+     * Cada subclase concreta debe sobreescribirlo para retornar su producto específico.
+     * @param {Object} datos
+     * @returns {import('./room.products.js').HabitacionBase}
+     */
     crearHabitacion(datos) {
         void datos;
         throw new Error(
@@ -27,8 +27,8 @@ export class CreadorHabitacion {
     }
 
     /**
-   * Valida la estructura mínima de entrada antes de delegar la creación.
-   */
+     * Valida la estructura mínima de entrada antes de delegar la creación.
+     */
     preparar(datos) {
         if (!datos || typeof datos !== 'object') {
             throw new Error('[CreadorHabitacion.preparar] Se esperaba un objeto de datos.');
@@ -71,18 +71,20 @@ export class CreadorSuite extends CreadorHabitacion {
  * Mapea la categoría solicitada con su respectivo creador, evitando condicionales if/else.
  */
 export class RoomFactory {
-
     static #creadores = Object.freeze({
-        SENCILLA:  new CreadorSencilla(),
-        DOBLE:     new CreadorDoble(),
-        SUITE:     new CreadorSuite(),
+        SENCILLA:   new CreadorSencilla(),
+        DOBLE:      new CreadorDoble(),
+        SUITE:      new CreadorSuite(),
         INDIVIDUAL: new CreadorSencilla(), // Alias compatible con 'SENCILLA'
     });
 
     /**
-   * Resuelve el creador apropiado y ejecuta el flujo de preparación.
-   */
-    static fabricar(tipo, datos) {
+     * Retorna la instancia del Creador Concreto según el tipo de habitación.
+     * Permite acceder directamente a la jerarquía de creadores del Factory Method.
+     * @param {string} tipo
+     * @returns {CreadorHabitacion}
+     */
+    static obtenerCreador(tipo) {
         const clave = String(tipo ?? '').trim().toUpperCase() || 'SENCILLA';
         const creador = this.#creadores[clave];
 
@@ -90,11 +92,20 @@ export class RoomFactory {
             throw new Error(
                 `[RoomFactory] Tipo de habitación '${tipo}' no soportado. ` +
                 `Valores oficiales permitidos: ${Object.keys(this.#creadores)
-                    .filter((k) => !['INDIVIDUAL'].includes(k)) // ocultar alias al usuario
+                    .filter((k) => !['INDIVIDUAL'].includes(k))
                     .join(', ')}.`
             );
         }
 
-        return creador.preparar(datos);
+        return creador;
+    }
+
+    /**
+     * Resuelve el creador apropiado y ejecuta el flujo de preparación.
+     */
+    static fabricar(tipo, datos) {
+        return this.obtenerCreador(tipo).preparar(datos);
     }
 }
+
+export default RoomFactory;

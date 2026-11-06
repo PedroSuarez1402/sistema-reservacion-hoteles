@@ -10,9 +10,9 @@ import {
     assertRequired,
 } from '../utils/errors.util.js';
 
-// Servicio lógica negocio Reservaciones
+// Servicio lógica negocio Reservaciones (Monolito :4000 - Línea Base sin patrones)
 class ReservationService {
-    // Crea nueva reservación validando disponibilidad
+    // Crea nueva reservación validando disponibilidad de forma procedimental
     static async createReservation(data) {
         const { usuario_id, habitacion_id, paquete_id, fecha_inicio, fecha_fin, estado } = data;
 
@@ -55,7 +55,7 @@ class ReservationService {
         const diferenciaMilisegundos = fin.getTime() - inicio.getTime();
         const diasReserva = Math.max(1, Math.ceil(diferenciaMilisegundos / (1000 * 60 * 60 * 24)));
         const subtotalHabitacion = diasReserva * parseFloat(habitacion.precio_noche);
-        // Esta seccion es el consumo del paquete sin utilizar farmaton
+
         // Si viene paquete_id, buscar el paquete y sus servicios asociados en la base de datos
         let totalPaquete = 0;
         if (paquete_id) {
@@ -100,6 +100,31 @@ class ReservationService {
             precio_total,
             estado: estado || 'CONFIRMADA',
         });
+
+        // =====================================================================
+        // ACCIONES POST-RESERVA MONOLÍTICAS (SIN PATRÓN OBSERVER - 100% ACOPLADAS)
+        // =====================================================================
+        // Acción 1: Generación directa y rígida de Link de WhatsApp
+        const waTelefono = '573183389453';
+        const waTexto = `Hola recepción, reserva monolítica #${nuevaReserva.id} creada para habitación #${habitacion.numero || habitacion_id}. Total: $${precio_total}`;
+        const waLink = `https://wa.me/${waTelefono}?text=${encodeURIComponent(waTexto)}`;
+        console.log(`📱 [Monolito Procedimental] WhatsApp Link generado rígidamente: ${waLink}`);
+
+        // Acción 2: Actualización directa de la habitación en la misma función
+        try {
+            await RoomRepository.update(habitacion_id, { estado: 'OCUPADA' });
+            console.log(`🏨 [Monolito Procedimental] Habitación ${habitacion_id} actualizada forzadamente a OCUPADA.`);
+        } catch (_roomErr) {
+            console.warn('⚠️ [Monolito Procedimental] No se pudo mutar habitación directamente.');
+        }
+
+        // Acción 3: Guardar log de auditoría directo y acoplado
+        const auditLogLine = `[AUDIT_LOG_MONOLITO] ${new Date().toISOString()} | RESERVA_CREADA | ID=${nuevaReserva.id} | USER=${usuario_id} | AMOUNT=${precio_total}`;
+        console.log(`🛡️ [Monolito Procedimental] Bitácora de auditoría escrita: ${auditLogLine}`);
+
+        // Acción 4: Notificación hardcoded directa
+        console.log(`📡 [Monolito Procedimental] Notificación rígida enviada directamente.`);
+        // =====================================================================
 
         return await ReservationRepository.getById(nuevaReserva.id);
     }

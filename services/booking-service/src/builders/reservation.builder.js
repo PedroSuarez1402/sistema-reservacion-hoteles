@@ -10,6 +10,9 @@ import { BadRequestError } from '../utils/errors.util.js';
  * Parsea una fecha en formato YYYY-MM-DD como fecha local (evita desfase horario UTC).
  */
 function __localDate(input) {
+    if (input instanceof Date) {
+        return new Date(input.getFullYear(), input.getMonth(), input.getDate(), 0, 0, 0, 0);
+    }
     const str = String(input || '').trim();
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
     if (m) return new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0);
@@ -41,16 +44,16 @@ export class ReservationBuilder {
     #observacionesRecepcion = null;
 
     /**
-   * Asocia el ID del cliente titular de la reservación (modelo Cliente).
-   */
+     * Asocia el ID del cliente titular de la reservación (modelo Cliente).
+     */
     conCliente(cliente_id) {
         this.#clienteId = cliente_id ? String(cliente_id).trim() : null;
         return this;
     }
 
     /**
-   * Asocia el ID del usuario titular (o usuario staff que gestiona la reserva).
-   */
+     * Asocia el ID del usuario titular (o usuario staff que gestiona la reserva).
+     */
     conHuesped(usuario_id) {
         this.#usuarioId = usuario_id ? String(usuario_id).trim() : null;
         if (!this.#clienteId && this.#usuarioId) {
@@ -60,8 +63,8 @@ export class ReservationBuilder {
     }
 
     /**
-   * Asocia la lista de acompañantes registrados para esta estancia (con deduplicación).
-   */
+     * Asocia la lista de acompañantes registrados para esta estancia (con deduplicación).
+     */
     conAcompanantes(lista) {
         if (Array.isArray(lista)) {
             const seenDocs = new Set();
@@ -95,25 +98,25 @@ export class ReservationBuilder {
     }
 
     /**
-   * Asocia el ID de la habitación (UUID desacoplado de Room Service).
-   */
+     * Asocia el ID de la habitación (UUID desacoplado de Room Service).
+     */
     paraHabitacion(habitacion_id) {
-        this.#habitacionId = habitacion_id;
+        this.#habitacionId = habitacion_id ? String(habitacion_id).trim() : null;
         return this;
     }
 
     /**
-   * Asocia el ID del paquete turístico seleccionado (opcional).
-   */
+     * Asocia el ID del paquete turístico seleccionado (opcional).
+     */
     conPaquete(paquete_id) {
         this.#paqueteId = paquete_id ? String(paquete_id).trim() : null;
         return this;
     }
 
     /**
-   * Asocia una estructura del Patrón Composite (CotizacionReserva) para calcular y desglosar el precio total.
-   * @param {import('../composite/CotizacionReserva.js').CotizacionReserva} cotizacion
-   */
+     * Asocia una estructura del Patrón Composite (CotizacionReserva) para calcular y desglosar el precio total.
+     * @param {import('../composite/CotizacionReserva.js').CotizacionReserva} cotizacion
+     */
     conCotizacion(cotizacion) {
         if (cotizacion && typeof cotizacion.calcularPrecio === 'function') {
             this.#cotizacion = cotizacion;
@@ -129,8 +132,8 @@ export class ReservationBuilder {
     }
 
     /**
-   * Asigna el rango de fechas y calcula automáticamente el número de noches.
-   */
+     * Asigna el rango de fechas y calcula automáticamente el número de noches.
+     */
     conFechas(fecha_inicio, fecha_fin) {
         this.#fechaInicio = __localDate(fecha_inicio);
         this.#fechaFin = __localDate(fecha_fin);
@@ -141,8 +144,8 @@ export class ReservationBuilder {
     }
 
     /**
-   * Calcula el desglose de tarifa (subtotal, IVA 16% y total) según el número de noches.
-   */
+     * Calcula el desglose de tarifa (subtotal, IVA 16% y total) según el número de noches.
+     */
     calcularTarifa(precio_noche) {
         const pn = Number(precio_noche);
         this.#precioNoche = Number.isFinite(pn) ? pn : 0;
@@ -154,8 +157,8 @@ export class ReservationBuilder {
     }
 
     /**
-   * Permite fijar un monto total precalculado o manual.
-   */
+     * Permite fijar un monto total precalculado o manual.
+     */
     conTotalManual(total) {
         const t = Number(total);
         this.#precioTotal = Number.isFinite(t) ? +t.toFixed(2) : null;
@@ -163,24 +166,24 @@ export class ReservationBuilder {
     }
 
     /**
-   * Define el estado inicial de la reserva ('PENDIENTE', 'CONFIRMADA', etc.).
-   */
+     * Define el estado inicial de la reserva ('PENDIENTE', 'CONFIRMADA', 'EN_CURSO', etc.).
+     */
     conEstado(estado = 'PENDIENTE') {
         this.#estado = estado;
         return this;
     }
 
     /**
-   * Agrega observaciones internas a la reserva.
-   */
+     * Agrega observaciones internas a la reserva.
+     */
     conNotas(notas) {
         this.#notas = String(notas ?? '').trim();
         return this;
     }
 
     /**
-   * Define el método de pago ('EFECTIVO', 'TRANSFERENCIA', 'TARJETA').
-   */
+     * Define el método de pago ('EFECTIVO', 'TRANSFERENCIA', 'TARJETA').
+     */
     conMetodoPago(metodo) {
         if (metodo !== undefined && metodo !== null) {
             this.#metodoPago = String(metodo).trim().toUpperCase();
@@ -189,8 +192,8 @@ export class ReservationBuilder {
     }
 
     /**
-   * Define el tipo de reservación ('INMEDIATA' o 'ANTICIPADA').
-   */
+     * Define el tipo de reservación ('INMEDIATA' o 'ANTICIPADA').
+     */
     conTipoReserva(tipo) {
         if (tipo !== undefined && tipo !== null) {
             this.#tipoReserva = String(tipo).trim().toUpperCase();
@@ -199,8 +202,8 @@ export class ReservationBuilder {
     }
 
     /**
-   * Define el valor de anticipo o abono inicial.
-   */
+     * Define el valor de anticipo o abono inicial.
+     */
     conAnticipo(monto) {
         const val = Number(monto);
         this.#anticipo = Number.isFinite(val) && val >= 0 ? +val.toFixed(2) : 0.00;
@@ -208,25 +211,25 @@ export class ReservationBuilder {
     }
 
     /**
-   * Indica si la reservación corresponde a una prórroga de estancia.
-   */
+     * Indica si la reservación corresponde a una prórroga de estancia.
+     */
     conProrroga(bool) {
         this.#esProrroga = Boolean(bool);
         return this;
     }
 
     /**
-   * Registra notas u observaciones operativas de recepción.
-   */
+     * Registra notas u observaciones operativas de recepción.
+     */
     conObservacionesRecepcion(texto) {
         this.#observacionesRecepcion = texto !== undefined && texto !== null ? String(texto).trim() : null;
         return this;
     }
 
     /**
-   * Método de construcción final (build): valida la integridad de los datos
-   * y retorna el payload normalizado para Sequelize.
-   */
+     * Método de construcción final (build): valida la integridad de los datos
+     * y retorna el payload normalizado para Sequelize.
+     */
     build() {
         const errores = [];
 
@@ -248,7 +251,7 @@ export class ReservationBuilder {
             errores.push('el precio total debe ser mayor a 0');
         }
 
-        const ESTADOS = new Set(['PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'FINALIZADA']);
+        const ESTADOS = new Set(['PENDIENTE', 'CONFIRMADA', 'EN_CURSO', 'CANCELADA', 'FINALIZADA']);
         const estadoFinal = (this.#estado || 'PENDIENTE').toString().toUpperCase();
         if (!ESTADOS.has(estadoFinal)) {
             errores.push(

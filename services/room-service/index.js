@@ -49,7 +49,11 @@ async function bootstrap() {
       // Registro de Suscripción en el Message Broker (Subscriber)
       // =====================================================================
       const BROKER_URL = process.env.BROKER_URL || 'http://localhost:4003';
-      const SELF_SUBSCRIBER_URL = process.env.ROOM_SERVICE_URL || `http://localhost:${PORT}/api/events`;
+      const baseRoomUrl = (process.env.ROOM_SERVICE_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
+      const SELF_SUBSCRIBER_URL = baseRoomUrl.endsWith('/api/events')
+        ? baseRoomUrl
+        : `${baseRoomUrl.replace(/\/api$/, '')}/api/events`;
+
       const subscription = { topico: 'RESERVA_CREADA', subscriberUrl: SELF_SUBSCRIBER_URL };
       setImmediate(function autoSubscribeToBroker() {
         fetch(`${BROKER_URL}/api/broker/subscribe`, {

@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import routes from './routes/index.js';
+import observerRoutes from './routes/observer.routes.js';
 import errorHandler from './middlewares/error.middleware.js';
 
 const app = express();
@@ -53,18 +54,22 @@ app.get('/', (req, res) => {
   res.json({
     nombre: 'Booking Service - Sistema de Reservaciones de Hoteles',
     version: '1.0.0',
-    servicio: 'Usuarios, Autenticación, Reservaciones',
+    servicio: 'Usuarios, Autenticación, Reservaciones, Chain of Responsibility & Observer',
     puerto: process.env.PORT || 4002,
     documentacion: {
       base: '/api',
       health: '/api/health',
       auth_usuarios: '/api/users',
       reservaciones: '/api/reservations',
+      observadores: '/api/observers',
+      toggle_observador: '/api/observers/toggle',
     },
   });
 });
 
 app.use('/api', routes);
+// Alias directo en raíz para /observers y /observers/toggle
+app.use('/observers', observerRoutes);
 
 app.use((req, res, next) => {
   res.status(404).json({

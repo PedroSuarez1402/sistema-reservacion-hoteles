@@ -66,6 +66,8 @@ const errorHandler = (err, req, res, next) => {
       return res.status(statusCode).json({
         status: 'error',
         message: error.message || 'Error en la solicitud',
+        ...(Array.isArray(error.validationTrace) ? { validationTrace: error.validationTrace } : {}),
+        ...(Array.isArray(error.notificationTrace) ? { notificationTrace: error.notificationTrace } : {}),
       });
     }
 
@@ -89,7 +91,10 @@ const errorHandler = (err, req, res, next) => {
 
   res.status(error.statusCode).json({
     status: 'error',
+    success: false,
     message: error.message,
+    ...(Array.isArray(error.validationTrace) ? { validationTrace: error.validationTrace } : {}),
+    ...(Array.isArray(error.notificationTrace) ? { notificationTrace: error.notificationTrace } : {}),
   });
 };
 

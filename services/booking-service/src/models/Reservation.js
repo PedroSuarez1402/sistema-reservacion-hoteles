@@ -3,14 +3,6 @@ import sequelize from '../config/database.js';
 
 // ======================================================================
 //  MODELO RESERVATION - BOOKING SERVICE (DESACOPLADO DE ROOM)
-//
-//  DECISIÓN ARQUITECTÓNICA (Siguiendo instrucciones del usuario):
-//  - habitacion_id YA NO ES ForeignKey hacia la tabla habitaciones
-//  - Es un campo INTEGER SIMPLE sin references (desacoplamiento DB)
-//  - NO existe belongsTo(Room) ni belongsToMany(Tag) en este servicio
-//  - NO existe el hook beforeCreate que importaba Room.js
-//    (el cálculo de precio_total es responsabilidad del service/controllers
-//     que pueden consultar al room-service vía REST si es necesario)
 // ======================================================================
 
 class Reservation extends Model {}
@@ -63,7 +55,7 @@ Reservation.init(
       allowNull: false,
     },
     estado: {
-      type: DataTypes.ENUM('PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'FINALIZADA'),
+      type: DataTypes.ENUM('PENDIENTE', 'CONFIRMADA', 'EN_CURSO', 'CANCELADA', 'FINALIZADA'),
       defaultValue: 'PENDIENTE',
       allowNull: false,
     },

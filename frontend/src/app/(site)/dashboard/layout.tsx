@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bed, Hotel, Users, ClipboardCheck, LayoutDashboard } from 'lucide-react';
+import { Bed, Hotel, Users, ClipboardCheck, LayoutDashboard, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import useAuth from '@/hooks/useAuth';
 import type { UserRole } from '@/types';
@@ -44,6 +44,12 @@ function DashboardSidebar() {
         label: 'Inventario Hotel',
         icon: <Hotel className="h-4 w-4" />,
         roles: ['ADMIN'], // Exclusivo de ADMIN
+      },
+      {
+        href: '/dashboard/patrones',
+        label: 'Laboratorio de Patrones',
+        icon: <Workflow className="h-4 w-4" />,
+        roles: ['ADMIN', 'RECEPCION'],
       },
     ];
 

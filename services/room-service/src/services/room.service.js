@@ -13,7 +13,7 @@ import {
 } from '../utils/errors.util.js';
 import { RoomFactory } from '../factories/room.factory.js';
 import { RoomContext, RoomFlyweightFactory } from '../flyweight/index.js';
-
+import BookingClient from '../clients/booking-client.js';
 
 class RoomService {
   /**
@@ -38,7 +38,6 @@ class RoomService {
     try {
       habitacionProducto = RoomFactory.fabricar(tipo, data);
     } catch (factoryErr) {
-
       throw new BadRequestError(factoryErr.message);
     }
 
@@ -68,7 +67,6 @@ class RoomService {
       try {
         await created.setEtiquetas(tagIdsToSet);
       } catch (err) {
-        
         try { await created.setEtiquetas([]); } catch (_) { /* ignore */ }
       }
     }
@@ -99,7 +97,14 @@ class RoomService {
     return new RoomContext(room);
   }
 
-  static async getAvailable(fecha_inicio, fecha_fin) {
+  /**
+   * Consulta disponibilidad real:
+   * 1. Descarta habitaciones en MANTENIMIENTO, LIMPIEZA o ELIMINADA (solo ACTIVA).
+   * 2. Filtra por categoría ('SENCILLA', 'DOBLE', 'SUITE') si se solicita.
+   * 3. Consulta booking-service y descarta habitaciones con traslape de reservas
+   *    activas ('PENDIENTE', 'CONFIRMADA', 'EN_CURSO').
+   */
+  static async getAvailable(fecha_inicio, fecha_fin, categoria = null) {
     assertRequired(fecha_inicio, 'La fecha de inicio es requerida');
     assertRequired(fecha_fin,    'La fecha de fin es requerida');
 
@@ -108,7 +113,28 @@ class RoomService {
     if (inicio >= fin) {
       throw new BadRequestError('La fecha de inicio debe ser anterior a la fecha de fin');
     }
-    const availableRooms = await RoomRepository.getAvailableRooms(inicio, fin);
+
+    let categoriaLimpia = null;
+    if (categoria) {
+      categoriaLimpia = String(categoria).trim().toUpperCase();
+      const CATEGORIAS_VALIDAS = new Set(['SENCILLA', 'DOBLE', 'SUITE']);
+      if (!CATEGORIAS_VALIDAS.has(categoriaLimpia)) {
+        throw new BadRequestError(
+          `Categoría '${categoria}' no válida. Valores permitidos: ${[...CATEGORIAS_VALIDAS].join(', ')}`
+        );
+      }
+    }
+
+    // Consulta reservas activas (PENDIENTE, CONFIRMADA, EN_CURSO) en booking-service
+    const occupiedRoomIds = await BookingClient.getOccupiedRoomIds(fecha_inicio, fecha_fin);
+
+    const availableRooms = await RoomRepository.getAvailableRooms({
+      fechaInicio: inicio,
+      fechaFin: fin,
+      categoria: categoriaLimpia,
+      occupiedRoomIds,
+    });
+
     // Aquí se usa el patrón Flyweight en las habitaciones disponibles
     return availableRooms.map((room) => new RoomContext(room));
   }
@@ -161,7 +187,7 @@ class RoomService {
 
     // Validación tag_ids existencia
     const tagIdsToSet = Array.isArray(data.tag_ids)
-      ? data.tag_ids.filter((x) => typeof x === 'string' && x.length > 0)
+      ? tag_ids.filter((x) => typeof x === 'string' && x.length > 0)
       : null;
     if (tagIdsToSet && tagIdsToSet.length > 0) {
       const count = await Tag.count({ where: { id: { [Op.in]: tagIdsToSet } } });

@@ -1,0 +1,9 @@
+{
+  "name": "sistema-reservacion-hoteles",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de Reservacion de Hoteles - Arquitectura de Patrones de Software",
+  "scripts": {
+    "demo:patrones": "node services/booking-service/src/cli/demo-sustentacion.js"
+  }
+}

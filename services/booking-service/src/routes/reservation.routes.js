@@ -4,6 +4,15 @@ import { verifyToken, isRecepcionOrAdmin } from '../middlewares/auth.middleware.
 
 const router = Router();
 
+// Endpoints de consulta y conmutación en caliente de Observadores también accesibles bajo /reservations/observers
+router.get('/observers', ReservationController.getObservers);
+router.post('/observers/toggle', ReservationController.toggleObserver);
+
+// Endpoints de disponibilidad real de habitaciones (sin requerir autenticación para el catálogo)
+router.get('/occupied-rooms', ReservationController.getOccupiedRooms);
+router.get('/available-rooms', ReservationController.getAvailableRooms);
+router.get('/availability', ReservationController.getAvailableRooms);
+
 router.get('/', verifyToken, isRecepcionOrAdmin, ReservationController.getAll);
 router.get('/me', verifyToken, ReservationController.getMyReservations);
 router.post('/', verifyToken, ReservationController.create);

@@ -13,7 +13,8 @@
     "db:ensure": "node --env-file=.env ensure-db.js",
     "db:sync": "node --env-file=.env sync-db.js",
     "seed": "node --env-file=.env src/seeders/index.js",
-    "seed:undo": "node --env-file=.env src/seeders/undo.js"
+    "seed:undo": "node --env-file=.env src/seeders/undo.js",
+    "demo:patrones": "node src/cli/demo-sustentacion.js"
   },
   "author": "",
   "license": "ISC",

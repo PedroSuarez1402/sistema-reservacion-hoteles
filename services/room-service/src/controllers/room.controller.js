@@ -28,14 +28,15 @@ class RoomController {
     }
   }
 
-  // Obtiene habitaciones disponibles en rango fechas
+  // Obtiene habitaciones disponibles en rango fechas y categoría
   static async getAvailable(req, res, next) {
     try {
-      const { fecha_inicio, fecha_fin } = req.query;
+      const { fecha_inicio, fecha_fin, categoria, tipo } = req.query;
       if (!fecha_inicio || !fecha_fin) {
         throw new BadRequestError('Los parámetros fecha_inicio y fecha_fin son requeridos');
       }
-      const rooms = await RoomService.getAvailable(fecha_inicio, fecha_fin);
+      const categoriaFiltro = categoria || tipo || null;
+      const rooms = await RoomService.getAvailable(fecha_inicio, fecha_fin, categoriaFiltro);
       res.status(200).json({
         success: true,
         message: 'Habitaciones disponibles obtenidas correctamente',

@@ -158,14 +158,14 @@ class ReservationRepository {
     return await this.getById(id);
   }
 
-  // Verifica disponibilidad: devuelve true si no hay solapamientos
+  // Verifica disponibilidad: devuelve true si no hay solapamientos con reservas activas (PENDIENTE, CONFIRMADA, EN_CURSO)
   static async checkAvailability(habitacion_id, fechaInicio, fechaFin, excludeReservationId = null) {
     const inicio = new Date(fechaInicio);
     const fin = new Date(fechaFin);
 
     const whereClause = {
       habitacion_id,
-      estado: { [Op.in]: ['PENDIENTE', 'CONFIRMADA'] },
+      estado: { [Op.in]: ['PENDIENTE', 'CONFIRMADA', 'EN_CURSO'] },
       fecha_inicio: { [Op.lt]: fin },
       fecha_fin: { [Op.gt]: inicio },
     };
@@ -178,14 +178,14 @@ class ReservationRepository {
     return count === 0;
   }
 
-  // Busca reservaciones que se solapan en rango fechas
+  // Busca reservaciones que se solapan en rango fechas con estados activos (PENDIENTE, CONFIRMADA, EN_CURSO)
   static async findOverlapping(habitacion_id, fechaInicio, fechaFin, excludeReservationId = null) {
     const inicio = new Date(fechaInicio);
     const fin = new Date(fechaFin);
 
     const whereClause = {
       habitacion_id,
-      estado: { [Op.in]: ['PENDIENTE', 'CONFIRMADA'] },
+      estado: { [Op.in]: ['PENDIENTE', 'CONFIRMADA', 'EN_CURSO'] },
       fecha_inicio: { [Op.lt]: fin },
       fecha_fin: { [Op.gt]: inicio },
     };
@@ -195,6 +195,34 @@ class ReservationRepository {
     }
 
     return await Reservation.findAll({ where: whereClause });
+  }
+
+  /**
+   * Retorna una lista deduplicada de UUIDs de habitaciones ocupadas por reservas activas
+   * (PENDIENTE, CONFIRMADA, EN_CURSO) en el rango [fechaInicio, fechaFin).
+   */
+  static async getOccupiedRoomIds(fechaInicio, fechaFin, excludeReservationId = null) {
+    const inicio = new Date(fechaInicio);
+    const fin = new Date(fechaFin);
+    if (inicio >= fin) return [];
+
+    const whereClause = {
+      estado: { [Op.in]: ['PENDIENTE', 'CONFIRMADA', 'EN_CURSO'] },
+      fecha_inicio: { [Op.lt]: fin },
+      fecha_fin: { [Op.gt]: inicio },
+    };
+
+    if (excludeReservationId) {
+      whereClause.id = { [Op.ne]: excludeReservationId };
+    }
+
+    const reservas = await Reservation.findAll({
+      where: whereClause,
+      attributes: ['habitacion_id'],
+      raw: true,
+    });
+
+    return [...new Set(reservas.map((r) => r.habitacion_id).filter(Boolean))];
   }
 
   // Obtiene reservaciones dentro de rango fechas dado
@@ -230,16 +258,24 @@ class ReservationRepository {
     return await Reservation.count({ where });
   }
 
-  // Obtiene estadísticas conteo por cada estado
+  // Obtiene estadísticas conteo por cada estado (incluyendo EN_CURSO)
   static async getStats() {
-    const [pendientes, confirmadas, canceladas, finalizadas, total] = await Promise.all([
+    const [pendientes, confirmadas, enCurso, canceladas, finalizadas, total] = await Promise.all([
       this.countByEstado('PENDIENTE'),
       this.countByEstado('CONFIRMADA'),
+      this.countByEstado('EN_CURSO'),
       this.countByEstado('CANCELADA'),
       this.countByEstado('FINALIZADA'),
       Reservation.count(),
     ]);
-    return { pendientes, confirmadas, canceladas, finalizadas, total };
+    return {
+      pendientes,
+      confirmadas,
+      en_curso: enCurso,
+      canceladas,
+      finalizadas,
+      total,
+    };
   }
 }
 
