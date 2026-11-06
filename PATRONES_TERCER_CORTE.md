@@ -127,10 +127,10 @@ classDiagram
     }
 
     ReservationValidationHandler --> ReservationValidationHandler : "nextHandler (0..1)"
-    ReservationValidationHandler <|-- DateCoherenceHandler : "Eslabón 1: Fechas y Cronología"
-    ReservationValidationHandler <|-- RoomStatusAndCapacityHandler : "Eslabón 2: Estado y Aforo"
-    ReservationValidationHandler <|-- OverlapAvailabilityHandler : "Eslabón 3: Calendario y Solapamientos"
-    ReservationValidationHandler <|-- PricingAndPackagePolicyHandler : "Eslabón 4: Políticas y Paquetes"
+    ReservationValidationHandler <|-- DateCoherenceHandler : "Eslabón 1 - Fechas y Cronología"
+    ReservationValidationHandler <|-- RoomStatusAndCapacityHandler : "Eslabón 2 - Estado y Aforo"
+    ReservationValidationHandler <|-- OverlapAvailabilityHandler : "Eslabón 3 - Calendario y Solapamientos"
+    ReservationValidationHandler <|-- PricingAndPackagePolicyHandler : "Eslabón 4 - Políticas y Paquetes"
 ```
 
 ### Eslabones de la Cadena y Responsabilidades:
